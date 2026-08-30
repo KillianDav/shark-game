@@ -151,7 +151,7 @@
   const CFG = {
     // Players hold station in a lane and dodge vertically - everyone "swims" at
     // the same speed, so there is no finish line: last one swimming wins.
-    world: { w: 1280, h: 720, waterTop: 96, waterBottom: 700, laneX: 250 },
+    world: { w: 1280, h: 720, waterTop: 96, waterBottom: 700, laneX: 250, scrollSpeed: 60 },
     player: { accY: 1400, dampY: 7.5, maxVy: 300, rx: 20, ry: 15 },
     shark: {
       minSpeed: 175, maxSpeed: 285,
@@ -440,6 +440,29 @@
   //  RENDER  - reads a snapshot, draws it. Pure output; never mutates state.
   // ==========================================================================
   const Render = {
+    // Sample the ocean background gradient at world y so the mouth interior
+    // (and anywhere else we cut into the fish) matches the water behind it.
+    // Gradient stops mirror drawState: top #0a3352, mid #083049, bottom #04202f.
+    _waterColorAt(y) {
+      const H = CFG.world.h;
+      const yy = clamp(y, 0, H);
+      const t = yy / H;
+      const top = [10, 51, 82], mid = [8, 48, 73], bot = [4, 32, 47];
+      let r, g, b;
+      if (t <= 0.5) {
+        const k = t / 0.5;
+        r = top[0] + (mid[0] - top[0]) * k;
+        g = top[1] + (mid[1] - top[1]) * k;
+        b = top[2] + (mid[2] - top[2]) * k;
+      } else {
+        const k = (t - 0.5) / 0.5;
+        r = mid[0] + (bot[0] - mid[0]) * k;
+        g = mid[1] + (bot[1] - mid[1]) * k;
+        b = mid[2] + (bot[2] - mid[2]) * k;
+      }
+      return "rgb(" + (r | 0) + "," + (g | 0) + "," + (b | 0) + ")";
+    },
+
     // --- shark art ported from the reference lemmings game -----------------
     drawSharkSprite(ctx, sx, sy, opts) {
       opts = opts || {};
@@ -493,7 +516,7 @@
         ctx.beginPath();
         ctx.ellipse(0, 0, 26, 11, 0, 0, 7);
         ctx.clip();
-        ctx.fillStyle = "#0c1820";
+        ctx.fillStyle = opts.waterFill || "#083049";
         ctx.beginPath();
         ctx.moveTo(7, 0);
         ctx.quadraticCurveTo(15, -g * 0.2, 25, -g);
@@ -794,29 +817,48 @@
       const W = CFG.world;
       if (!Render._seabed) Render._seabed = Render._buildSeabed();
 
-      // sandy strip with a soft dune silhouette
+      // Underwater current: shift the whole seabed left over time so the
+      // stationary swimmers feel like they're actually moving forward. Tie
+      // scroll speed to the shared tempo multiplier so the world rushes by
+      // faster as the difficulty ramps.
+      const tileW = W.w;
+      const scrollX = state.t * W.scrollSpeed * Sim._speedMul(state.t);
+      const offset = ((scrollX % tileW) + tileW) % tileW;
+
+      // Dune ridge silhouette — evaluated in world coords so the ridge
+      // scrolls continuously with no visible seam at the tile wrap.
       ctx.fillStyle = "#1a3d2e";
       ctx.beginPath();
       ctx.moveTo(0, W.h);
       ctx.lineTo(0, W.waterBottom);
-      for (let x = 0; x <= W.w; x += 24) {
-        ctx.lineTo(x, W.waterBottom - 3 - Math.sin(x * 0.018) * 4 - Math.sin(x * 0.05) * 2);
+      for (let sx = 0; sx <= W.w; sx += 24) {
+        const wx = sx + scrollX;
+        ctx.lineTo(sx, W.waterBottom - 3 - Math.sin(wx * 0.018) * 4 - Math.sin(wx * 0.05) * 2);
       }
       ctx.lineTo(W.w, W.h);
       ctx.closePath(); ctx.fill();
+      // Flat sand underneath the dune - uniform colour, no scroll needed.
       ctx.fillStyle = "#24503c";
       ctx.fillRect(0, W.waterBottom + 4, W.w, W.h - W.waterBottom);
 
+      // Props scroll with the current. Draw the whole tile twice back-to-back
+      // so as one copy slides off the left, the other slides in from the right.
       const order = { rock: 0, shell: 1, starfish: 2, coral: 3, kelp: 4, chest: 5 };
       const props = Render._seabed.slice().sort((a, b) => (order[a.kind] || 0) - (order[b.kind] || 0));
-      for (const it of props) {
-        if (it.kind === "kelp") Render.drawKelp(ctx, it, state.frame);
-        else if (it.kind === "coral") Render.drawCoral(ctx, it);
-        else if (it.kind === "rock") Render.drawRock(ctx, it);
-        else if (it.kind === "starfish") Render.drawStarfish(ctx, it, state.frame);
-        else if (it.kind === "chest") Render.drawChest(ctx, it);
-        else if (it.kind === "shell") Render.drawShell(ctx, it);
+      ctx.save();
+      ctx.translate(-offset, 0);
+      for (let pass = 0; pass < 2; pass++) {
+        for (const it of props) {
+          if (it.kind === "kelp") Render.drawKelp(ctx, it, state.frame);
+          else if (it.kind === "coral") Render.drawCoral(ctx, it);
+          else if (it.kind === "rock") Render.drawRock(ctx, it);
+          else if (it.kind === "starfish") Render.drawStarfish(ctx, it, state.frame);
+          else if (it.kind === "chest") Render.drawChest(ctx, it);
+          else if (it.kind === "shell") Render.drawShell(ctx, it);
+        }
+        ctx.translate(tileW, 0);
       }
+      ctx.restore();
     },
 
     drawState(ctx, state) {
@@ -862,7 +904,8 @@
           tailWave: state.frame * 0.26 + sh.id,
           tailPropel: 1,
           laserEyes: charging || firing,
-          open: chompN > 0 ? 0.45 + chompN * 0.5 : 0   // closed normally; toothy bite when eating
+          open: chompN > 0 ? 0.45 + chompN * 0.5 : 0,  // closed normally; toothy bite when eating
+          waterFill: Render._waterColorAt(sh.y)         // mouth interior matches the water behind the shark
         });
         if (charging) Render.drawWindupCharge(ctx, sh, state.frame);
         if (firing) Render.drawSharkLaser(ctx, sh, state.frame);
