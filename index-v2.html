@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Standup Shark - Who runs the next standup?</title>
+<style>
+  :root { --bg:#04121f; --panel:#0c2036; --accent:#33d0ff; --accent2:#2aa0ff; --text:#e7f4ff; --muted:#8fb2cc; --danger:#ff4a4a; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; height:100%; background: radial-gradient(1200px 700px at 50% -10%, #0a2a45, var(--bg)); color: var(--text); font-family:"Segoe UI", Tahoma, sans-serif; overflow:hidden; }
+  #app { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:12px; }
+  h1 { margin:0; font-size:clamp(22px,4vw,40px); letter-spacing:1px; text-shadow:0 2px 0 #000a, 0 0 18px #33d0ff55; }
+  h1 .pop { color: var(--accent); }
+  .subtitle { color: var(--muted); margin:-4px 0 2px; font-size:14px; max-width:640px; text-align:center; }
+  #setup { background: var(--panel); border:1px solid #1c3a5c; border-radius:16px; padding:22px; width:min(580px,92vw); box-shadow:0 18px 60px #0008; display:flex; flex-direction:column; gap:12px; }
+  #setup label.field { font-weight:600; font-size:14px; }
+  #names { width:100%; min-height:150px; resize:vertical; background:#071829; color:var(--text); border:1px solid #1c3a5c; border-radius:10px; padding:12px; font-family:"Consolas", monospace; font-size:15px; line-height:1.5; }
+  .hint { color: var(--muted); font-size:13px; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .field-row { display:flex; gap:10px; align-items:center; }
+  .field-row input[type=number] { width:70px; background:#071829; color:var(--text); border:1px solid #1c3a5c; border-radius:8px; padding:8px; font-size:15px; }
+  button { cursor:pointer; border:none; border-radius:10px; padding:12px 18px; font-size:16px; font-weight:700; color:#03212e; background:linear-gradient(180deg,#4fe0ff,#22a7d6); box-shadow:0 6px 0 #12617e, 0 8px 18px #0006; transition:transform .05s ease, box-shadow .05s ease; }
+  button:active { transform:translateY(4px); box-shadow:0 2px 0 #12617e, 0 4px 10px #0006; }
+  button.secondary { color:var(--text); background:linear-gradient(180deg,#2f4685,#243668); box-shadow:0 6px 0 #15224a, 0 8px 18px #0006; }
+  button.secondary:active { box-shadow:0 2px 0 #15224a; }
+  button.small { padding:8px 14px; font-size:14px; }
+  #stage { position:relative; width:min(1280px,96vw); display:none; }
+  #stage.active { display:block; }
+  canvas { width:100%; height:auto; display:block; background:#04121f; border:3px solid #06202f; border-radius:10px; box-shadow:0 20px 60px #000a; }
+  #stageBar { display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:10px; flex-wrap:wrap; }
+  #status { color: var(--muted); font-size:14px; }
+  .barBtns { display:flex; gap:8px; }
+  #stage:fullscreen { width:100vw; height:100vh; background:var(--bg); border-radius:0; display:flex; flex-direction:column; justify-content:center; padding:10px; }
+  #stage:fullscreen canvas { width:auto; height:calc(100vh - 60px); max-width:100vw; margin:0 auto; border-radius:6px; }
+  #stage:fullscreen #stageBar { padding:0 16px; }
+  #result { position:absolute; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column; gap:8px; text-align:center; background: radial-gradient(60% 60% at 50% 40%, rgba(4,18,31,0.72), rgba(4,18,31,0.93)); border-radius:10px; padding:20px; pointer-events:none; }
+  #result.show { display:flex; animation:fade .4s ease; pointer-events:auto; }
+  #result button { pointer-events:auto; }
+  @keyframes fade { from{opacity:0;} to{opacity:1;} }
+  #result .resultLead { font-size:clamp(16px,2.8vw,24px); font-weight:600; max-width:min(720px, 92vw); line-height:1.35; color:var(--muted); }
+  #result .who { font-size:clamp(32px,7vw,72px); font-weight:800; text-shadow:0 2px 0 #000a, 0 0 24px #33d0ff88; margin:6px 0 2px; display:flex; align-items:center; gap:14px; }
+  #result .tag { color:var(--muted); font-size:clamp(13px,2vw,18px); min-height:1.2em; }
+  #swatch { width:30px; height:30px; border-radius:8px; display:inline-block; vertical-align:middle; border:2px solid #fff3; }
+  .footer { color:var(--muted); font-size:12px; opacity:.8; text-align:center; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div style="text-align:center">
+    <h1>Standup <span class="pop">Shark</span></h1>
+    <div class="subtitle">Dodge the laser-eyed sharks with the up/down arrows. Sharks swarm harder as time goes on &mdash; the last one swimming runs the next standup!</div>
+  </div>
+
+  <div id="setup">
+    <label class="field" for="names">Team members (one per line)</label>
+    <textarea id="names" spellcheck="false" placeholder="Ahmed&#10;Ben&#10;Chris"></textarea>
+
+    <div class="field-row">
+      <label class="field" for="botCount">Practice bots</label>
+      <input type="number" id="botCount" min="0" max="10" value="3" />
+      <span class="hint">Extra AI swimmers so you can test with one keyboard. Set 0 for solo.</span>
+    </div>
+
+    <div class="row">
+      <button id="startBtn">Start the swim</button>
+      <button id="resetNamesBtn" class="secondary">Reset to defaults</button>
+    </div>
+    <div class="hint">You control the first name in the list with the &uarr; / &darr; arrow keys. Bots dodge on their own.</div>
+  </div>
+
+  <div id="stage">
+    <canvas id="game" width="1280" height="720"></canvas>
+    <div id="result">
+      <div class="resultLead" id="resultLead"></div>
+      <div class="who"><span id="swatch"></span><span id="winnerName"></span></div>
+      <div class="tag" id="winnerTag"></div>
+      <div class="row" style="justify-content:center; margin-top:8px;">
+        <button id="againBtn">Swim again</button>
+        <button id="editBtn" class="secondary">Edit team</button>
+      </div>
+    </div>
+    <div id="stageBar">
+      <div id="status">Get ready&hellip;</div>
+      <div class="barBtns">
+        <button id="fsBtn" class="secondary small">Fullscreen</button>
+        <button id="skipBtn" class="secondary small">Skip to result</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Standup Shark &middot; single-player build &middot; runs offline &middot; built to drop into a shared multiplayer arena (see README).</div>
+</div>
+
+<script>
+/* ============================================================================
+ * Standup Shark - single-player, self-contained build.
+ *
+ * ARCHITECTURE (see README.md "Phase 2" for the multiplayer swap):
+ *   Sim        - pure game logic. No DOM/canvas. Deterministic given a seed.
+ *                createState(config) and step(state, humanInputs, dt).
+ *   Render     - reads a state snapshot and draws it. Ports the shark art from
+ *                the reference lemmings game (drawSharkSprite / drawSharkLasers).
+ *   Input      - maps arrow keys to {up, down} intents.
+ *   Transport  - the ONLY seam that changes for multiplayer. LocalTransport runs
+ *                the Sim in this tab. A future WebSocketTransport would send
+ *                inputs to a server running the same Sim and receive snapshots.
+ *   main       - glue: gather input -> transport -> render, on a fixed timestep.
+ * ==========================================================================*/
+(function () {
+  "use strict";
+
+  // --------------------------------------------------------------------------
+  // Utilities (pure, deterministic-friendly)
+  // --------------------------------------------------------------------------
+  const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  // mulberry32 seeded PRNG - identical output on any JS engine (client/server).
+  function makeRng(seed) {
+    let s = seed >>> 0;
+    return function () {
+      s |= 0; s = (s + 0x6d2b79f5) | 0;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const PLAYER_COLORS = [
+    "#ffd23f", "#ff6b6b", "#4ecdc4", "#c084fc", "#ff9f45",
+    "#7ee787", "#f78fb3", "#57c7ff", "#ffe066", "#b388ff", "#00e5a8"
+  ];
+
+  // --------------------------------------------------------------------------
+  // CONFIG - tunables shared by sim + render
+  // --------------------------------------------------------------------------
+  const CFG = {
+    // Players hold station in a lane and dodge vertically - everyone "swims" at
+    // the same speed, so there is no finish line: last one swimming wins.
+    world: { w: 1280, h: 720, waterTop: 96, waterBottom: 700, laneX: 250 },
+    player: { accY: 1400, dampY: 7.5, maxVy: 300, rx: 20, ry: 15 },
+    shark: {
+      minSpeed: 175, maxSpeed: 285,
+      spawnStart: 2.0,   // seconds between spawns at t=0 (few sharks to start)
+      spawnMin: 0.26,    // fastest spawn interval late-game (dense swarm)
+      rampTime: 26,      // seconds to reach peak difficulty (steep, front-loaded)
+      rampEase: 0.6,     // <1 front-loads the ramp so it gets hard fast
+      minY: 120, maxY: 678,   // reaches the full swimmer range - no safe top/bottom corner
+      aimAtSwimmer: true,     // on entry, aim at a swimmer's current y (locked, dodgeable)
+      scaleMin: 1.55, scaleMax: 1.95,   // sprite scale (bigger sharks)
+      bodyRX: 40, bodyRY: 20,           // collision ellipse (matches bigger art)
+      // vertical swimming (sharks weave up/down as they cross)
+      waveAmpMin: 55, waveAmpMax: 165, waveFreqMin: 0.7, waveFreqMax: 1.8,
+      laserChance: 0.55,           // chance a shark decides to fire when off cooldown
+      laserCooldownMin: 1.2, laserCooldownMax: 3.0,
+      laserWindup: 0.5,            // eyes glow before firing (telegraph, harmless)
+      laserActive: 0.5,            // beam is lethal this long
+      laserRange: 1000, laserBand: 17,
+      chomp: 0.42                  // seconds a shark holds its jaws open after a bite
+    },
+    fx: { vaporDur: 0.8, eatDur: 0.3 },  // laser vaporise + eaten shrink durations
+    fixedDt: 1 / 60
+  };
+
+  // ==========================================================================
+  //  SIM  - pure logic. Everything here is a function of (state, inputs, dt).
+  // ==========================================================================
+  const Sim = {
+    createState(config) {
+      const seed = (config && config.seed) || (Date.now() & 0xffffffff);
+      const rng = makeRng(seed);
+      const W = CFG.world;
+      const players = (config.players || []).map((p, i) => ({
+        id: p.id != null ? p.id : i,
+        name: p.name,
+        color: p.color || PLAYER_COLORS[i % PLAYER_COLORS.length],
+        isBot: !!p.isBot,
+        x: CFG.world.laneX + (i % 4) * 16,   // hold station, slight stagger
+        y: lerp(CFG.world.waterTop + 60, CFG.world.waterBottom - 60, (i + 1) / ((config.players.length) + 1)),
+        vy: 0,
+        alive: true,
+        deathT: null,
+        deathKind: null,   // "eaten" | "laser"
+        deathX: 0, deathY: 0,
+        botBias: rng() * 0.6 - 0.3,      // per-bot steering personality
+        botReact: 0.45 + rng() * 0.5     // per-bot detection range factor
+      }));
+      return {
+        seed, rng,
+        t: 0, frame: 0,
+        status: "playing",          // "playing" | "over"
+        players,
+        sharks: [],
+        nextSharkId: 1,
+        spawnTimer: 0.8,
+        winnerId: null
+      };
+    },
+
+    // 0..1 difficulty factor, eased so it climbs quickly early on.
+    _difficulty(t) {
+      const s = CFG.shark;
+      return Math.pow(clamp(t / s.rampTime, 0, 1), s.rampEase);
+    },
+
+    // Difficulty-scaled spawn interval.
+    _spawnInterval(t) {
+      const s = CFG.shark;
+      return lerp(s.spawnStart, s.spawnMin, Sim._difficulty(t));
+    },
+
+    _spawnShark(state) {
+      const s = CFG.shark, rng = state.rng, W = CFG.world;
+      const k = Sim._difficulty(state.t);
+      const speed = lerp(s.minSpeed, s.maxSpeed, rng()) * (1 + 0.6 * k);
+      const startX = W.w + 60;
+      const swimT = rng() * 10;
+      const waveAmp = lerp(s.waveAmpMin, s.waveAmpMax, rng()) * (0.7 + 0.5 * k);  // weave more late-game
+      const waveFreq = lerp(s.waveFreqMin, s.waveFreqMax, rng());
+      const wavePhase = rng() * Math.PI * 2;
+
+      // Lock onto a swimmer's CURRENT position at entry, then never re-adjust.
+      // We solve baseY so the weaving path crosses the swimmer's lane exactly at
+      // that swimmer's y-at-spawn - an aimed shot the swimmer can still dodge by
+      // moving, since the shark commits to this trajectory and does not home.
+      const alive = state.players.filter((p) => p.alive);
+      let baseY;
+      if (s.aimAtSwimmer && alive.length) {
+        const target = alive[(rng() * alive.length) | 0];
+        const ty = clamp(target.y, s.minY, s.maxY);
+        const tHit = (startX - target.x) / speed;   // seconds until it reaches the lane
+        baseY = ty - Math.sin((swimT + tHit) * waveFreq + wavePhase) * waveAmp;
+      } else {
+        baseY = lerp(s.minY, s.maxY, rng());
+      }
+
+      state.sharks.push({
+        id: state.nextSharkId++,
+        x: startX,
+        y: clamp(baseY + Math.sin(swimT * waveFreq + wavePhase) * waveAmp, s.minY, s.maxY),
+        baseY, swimT, waveAmp, waveFreq, wavePhase,
+        vx: -speed,
+        bob: rng() * Math.PI * 2,
+        scale: lerp(s.scaleMin, s.scaleMax, rng()),
+        chomp: 0,   // >0 while jaws are open after biting
+        laser: { state: "idle", timer: s.laserCooldownMin + rng() * (s.laserCooldownMax - s.laserCooldownMin) }
+      });
+    },
+
+    // Eye position of a leftward-swimming shark (front of the head).
+    _eye(sh) { return { x: sh.x - 18, y: sh.y - 4 }; },
+
+    // Compute a bot's {up, down} intent from the current world state.
+    _botIntent(state, p) {
+      const s = CFG.shark;
+      const detect = 340 * p.botReact;
+      let threatY = null, best = Infinity;
+      for (const sh of state.sharks) {
+        const dx = sh.x - p.x;
+        if (dx < -40 || dx > detect) continue;         // only sharks ahead & near
+        if (dx < best) { best = dx; threatY = sh.y; }
+        // treat a charging/firing laser lane as a threat too
+        if (sh.laser.state !== "idle") {
+          const eye = Sim._eye(sh);
+          if (p.x < eye.x && p.x > eye.x - s.laserRange && dx < detect + 200) {
+            if (Math.abs(dx) < best) { best = Math.abs(dx); threatY = eye.y; }
+          }
+        }
+      }
+      if (threatY == null) {
+        // drift gently toward vertical centre
+        const mid = (CFG.world.waterTop + CFG.world.waterBottom) / 2;
+        if (p.y < mid - 40) return { up: false, down: true };
+        if (p.y > mid + 40) return { up: true, down: false };
+        return { up: false, down: false };
+      }
+      const bias = p.botBias * 30;
+      if (p.y < threatY + bias) return { up: true, down: false };
+      return { up: false, down: true };
+    },
+
+    step(state, humanInputs, dt) {
+      if (state.status === "over") return state;
+      const W = CFG.world, P = CFG.player, S = CFG.shark;
+      state.t += dt;
+      state.frame++;
+
+      // --- spawn sharks ---
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0) {
+        Sim._spawnShark(state);
+        state.spawnTimer += Sim._spawnInterval(state.t);
+      }
+
+      // --- move sharks + drive their lasers ---
+      for (const sh of state.sharks) {
+        sh.x += sh.vx * dt;
+        sh.bob += dt * 6;
+        // weave vertically as it swims across
+        sh.swimT += dt;
+        sh.y = clamp(sh.baseY + Math.sin(sh.swimT * sh.waveFreq + sh.wavePhase) * sh.waveAmp, S.minY, S.maxY);
+        if (sh.chomp > 0) sh.chomp = Math.max(0, sh.chomp - dt);
+        const L = sh.laser;
+        L.timer -= dt;
+        if (L.state === "idle") {
+          if (L.timer <= 0 && sh.x > 120 && sh.x < W.w - 40) {
+            if (state.rng() < S.laserChance) { L.state = "windup"; L.timer = S.laserWindup; L.y = sh.y; }
+            else { L.timer = S.laserCooldownMin + state.rng() * (S.laserCooldownMax - S.laserCooldownMin); }
+          }
+        } else if (L.state === "windup") {
+          L.y = sh.y;
+          if (L.timer <= 0) { L.state = "firing"; L.timer = S.laserActive; L.y = sh.y; }
+        } else if (L.state === "firing") {
+          if (L.timer <= 0) { L.state = "idle"; L.timer = S.laserCooldownMin + state.rng() * (S.laserCooldownMax - S.laserCooldownMin); }
+        }
+      }
+      // cull off-screen sharks
+      state.sharks = state.sharks.filter((sh) => sh.x > -80);
+
+      // --- move players (vertical dodging only; they hold their lane) ---
+      for (const p of state.players) {
+        if (!p.alive) continue;
+        const intent = p.isBot ? Sim._botIntent(state, p) : (humanInputs[p.id] || { up: false, down: false });
+        let acc = 0;
+        if (intent.up) acc -= P.accY;
+        if (intent.down) acc += P.accY;
+        p.vy += acc * dt;
+        if (!intent.up && !intent.down) p.vy -= p.vy * clamp(P.dampY * dt, 0, 1);
+        p.vy = clamp(p.vy, -P.maxVy, P.maxVy);
+        p.y += p.vy * dt;
+        if (p.y < W.waterTop + P.ry) { p.y = W.waterTop + P.ry; p.vy = 0; }
+        if (p.y > W.waterBottom - P.ry) { p.y = W.waterBottom - P.ry; p.vy = 0; }
+      }
+
+      // --- collisions (eat + laser) ---
+      for (const p of state.players) {
+        if (!p.alive) continue;
+        for (const sh of state.sharks) {
+          // body overlap (normalised ellipse test)
+          const dx = (p.x - sh.x) / (S.bodyRX + P.rx);
+          const dy = (p.y - sh.y) / (S.bodyRY + P.ry);
+          if (dx * dx + dy * dy <= 1) { sh.chomp = S.chomp; Sim._kill(state, p, "eaten", sh.x, sh.y); break; }
+          // laser lane
+          if (sh.laser.state === "firing") {
+            const eye = Sim._eye(sh);
+            if (p.x <= eye.x && p.x >= eye.x - S.laserRange && Math.abs(p.y - eye.y) <= S.laserBand + P.ry * 0.5) {
+              Sim._kill(state, p, "laser", p.x, p.y); break;
+            }
+          }
+        }
+      }
+
+      Sim._resolveWinner(state);
+      return state;
+    },
+
+    _kill(state, p, kind, x, y) {
+      p.alive = false;
+      p.deathT = state.t;
+      p.deathKind = kind;
+      p.deathX = x; p.deathY = y;
+    },
+
+    _resolveWinner(state) {
+      if (state.status === "over" || !state.players.length) return;
+      const alive = state.players.filter((p) => p.alive);
+      // With multiple swimmers, the last one still swimming wins.
+      if (state.players.length > 1 && alive.length === 1) {
+        state.winnerId = alive[0].id;
+        state.status = "over";
+        return;
+      }
+      // Everyone is out -> whoever survived longest wins (also covers solo play).
+      if (alive.length === 0) {
+        const survivors = state.players.slice().sort((a, b) => (b.deathT - a.deathT) || (a.id - b.id));
+        state.winnerId = survivors[0].id;
+        state.status = "over";
+      }
+    }
+  };
+
+  // ==========================================================================
+  //  RENDER  - reads a snapshot, draws it. Pure output; never mutates state.
+  // ==========================================================================
+  const Render = {
+    // --- shark art ported from the reference lemmings game -----------------
+    drawSharkSprite(ctx, sx, sy, opts) {
+      opts = opts || {};
+      let angle = opts.angle != null ? opts.angle : 0;
+      const tailWave = opts.tailWave || 0;
+      const tailPropel = opts.tailPropel || 0;
+      const open = opts.open || 0;
+      const laserEyes = opts.laserEyes || false;
+
+      const scale = opts.scale || 1.5;
+      let flipX = false;
+      if (Math.abs(Math.sin(angle)) < 0.45) { flipX = Math.cos(angle) < 0; angle = 0; }
+
+      ctx.save();
+      ctx.translate(sx, sy);
+      if (flipX) ctx.scale(-1, 1);
+      ctx.rotate(angle);
+      ctx.scale(scale, scale);
+
+      const tailAng = Math.sin(tailWave) * (0.28 + tailPropel * 0.42);
+      ctx.save();
+      ctx.translate(-28, 0);
+      ctx.rotate(tailAng);
+      ctx.fillStyle = "#36444e";
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-14, -11); ctx.lineTo(-14, 11); ctx.closePath(); ctx.fill();
+      ctx.restore();
+
+      ctx.fillStyle = "#4a5a66";
+      ctx.beginPath(); ctx.ellipse(0, 0, 26, 11, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = "#5d6e7a"; ctx.beginPath(); ctx.ellipse(0, -2, 22, 5, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = "#3e4d57";
+      ctx.beginPath(); ctx.moveTo(2, 4); ctx.lineTo(14, 13); ctx.lineTo(-2, 7); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#36444e";
+      ctx.beginPath(); ctx.moveTo(-7, -7); ctx.lineTo(6, -20); ctx.lineTo(14, -7); ctx.closePath(); ctx.fill();
+
+      if (laserEyes) {
+        ctx.fillStyle = "#ff2222"; ctx.shadowColor = "#ff0000"; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.arc(13, -4, 3.2, 0, 7); ctx.arc(19, -4, 3.2, 0, 7); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#fff"; ctx.fillRect(12, -5, 2, 2); ctx.fillRect(18, -5, 2, 2);
+      } else {
+        ctx.fillStyle = "#0d141a"; ctx.beginPath(); ctx.arc(13, -3, 1.8, 0, 7); ctx.fill();
+      }
+
+      const snout = 22;
+      if (open > 0.05) {
+        const gap = 5 + open * 16;
+        ctx.fillStyle = "#13202a";
+        ctx.beginPath(); ctx.moveTo(8, -6); ctx.lineTo(snout + 4, -gap); ctx.lineTo(snout + 4, gap); ctx.lineTo(8, 6); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#fff";
+        for (let i = 0; i < 4; i++) {
+          const fx = 10 + i * 4;
+          ctx.beginPath(); ctx.moveTo(fx, -gap * 0.7); ctx.lineTo(fx + 1.6, -gap * 0.7 + 4); ctx.lineTo(fx - 1.6, -gap * 0.7 + 4); ctx.closePath(); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(fx, gap * 0.7); ctx.lineTo(fx + 1.6, gap * 0.7 - 4); ctx.lineTo(fx - 1.6, gap * 0.7 - 4); ctx.closePath(); ctx.fill();
+        }
+      } else {
+        ctx.strokeStyle = "#26323b"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(16, 2); ctx.lineTo(snout, 2); ctx.stroke();
+      }
+      ctx.restore();
+    },
+
+    drawSharkLaser(ctx, sh, frame) {
+      const eye = Sim._eye(sh);
+      const range = CFG.shark.laserRange;
+      const x1 = eye.x - range, y1 = eye.y;   // beam fires leftward
+      ctx.strokeStyle = "rgba(255,40,40,0.85)";
+      ctx.lineWidth = 5; ctx.shadowColor = "#ff2222"; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.moveTo(eye.x, eye.y); ctx.lineTo(x1, y1); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,220,120,0.95)"; ctx.lineWidth = 2; ctx.shadowBlur = 4;
+      ctx.beginPath(); ctx.moveTo(eye.x, eye.y); ctx.lineTo(x1, y1); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#ff4444";
+      ctx.beginPath(); ctx.arc(eye.x, eye.y, 3 + (frame % 6 === 0 ? 1 : 0), 0, 7); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.fillRect(eye.x - 1, eye.y - 1, 2, 2);
+    },
+
+    drawWindupCharge(ctx, sh, frame) {
+      const eye = Sim._eye(sh);
+      const pulse = 2 + Math.abs(Math.sin(frame * 0.4)) * 4;
+      ctx.fillStyle = "rgba(255,60,60,0.35)"; ctx.shadowColor = "#ff2222"; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(eye.x, eye.y, pulse, 0, 7); ctx.fill();
+      ctx.shadowBlur = 0;
+    },
+
+    drawPlayer(ctx, p, state) {
+      const frame = state.frame;
+      let alpha = 1, scale = 1, showBody = true, showName = true, vaporSparks = false;
+
+      if (!p.alive) {
+        const age = state.t - (p.deathT || 0);
+        if (p.deathKind === "laser") {
+          // Gentle flashing, then vaporise (shrink + fade to nothing).
+          const dur = CFG.fx.vaporDur;
+          if (age >= dur) return;                 // fully vaporised
+          const t = age / dur;
+          alpha = (0.55 + 0.45 * Math.sin(age * 34)) * (1 - t);  // flicker, fading out
+          scale = 1 - t * 0.6;
+          vaporSparks = true;
+          showName = false;
+        } else {
+          // Eaten: quick shrink into the shark's jaws.
+          const dur = CFG.fx.eatDur;
+          if (age >= dur) return;
+          const t = age / dur;
+          alpha = 1 - t;
+          scale = 1 - t * 0.8;
+          showName = false;
+        }
+      }
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const wob = Math.sin(frame * 0.3 + p.id) * 3;
+      ctx.save();
+      ctx.translate(p.x, p.y + (p.alive ? wob : 0));
+      ctx.scale(scale, scale);
+
+      if (vaporSparks) {
+        // faint rising motes as the swimmer dissolves
+        ctx.fillStyle = "rgba(180,230,255,0.7)";
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + frame * 0.2;
+          const r = 14 + (frame % 12);
+          ctx.fillRect(Math.cos(a) * r, Math.sin(a) * r - (frame % 20), 2, 2);
+        }
+      }
+
+      // body (a little swimmer fish in the player's colour)
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(-26, -9); ctx.lineTo(-26, 9); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 0, 18, 13, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.beginPath(); ctx.ellipse(2, 4, 12, 5, 0, 0, 7); ctx.fill();
+      // eye (looking right, the way it swims)
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(9, -3, 4, 0, 7); ctx.fill();
+      ctx.fillStyle = "#0b1522"; ctx.beginPath(); ctx.arc(10.5, -3, 2, 0, 7); ctx.fill();
+      if (!p.alive) {
+        ctx.strokeStyle = "#0b1522"; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(7, -5); ctx.lineTo(12, -1); ctx.moveTo(12, -5); ctx.lineTo(7, -1); ctx.stroke();
+      }
+      ctx.restore();
+
+      if (showName) {
+        ctx.globalAlpha = 1;
+        ctx.font = "bold 13px 'Segoe UI', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillText(p.name, p.x, p.y - 22 + 1);
+        ctx.fillStyle = p.alive ? "#eaf6ff" : "#9aa6c8";
+        ctx.fillText(p.name, p.x, p.y - 22);
+      }
+      ctx.restore();
+    },
+
+    drawState(ctx, state) {
+      const W = CFG.world;
+      ctx.clearRect(0, 0, W.w, W.h);
+
+      // --- ocean background ---
+      const g = ctx.createLinearGradient(0, 0, 0, W.h);
+      g.addColorStop(0, "#0a3352");
+      g.addColorStop(0.5, "#083049");
+      g.addColorStop(1, "#04202f");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W.w, W.h);
+
+      // sky-ish band above water surface
+      ctx.fillStyle = "#0b2135"; ctx.fillRect(0, 0, W.w, W.waterTop);
+      // water surface line with light ripples
+      ctx.strokeStyle = "rgba(120,200,255,0.35)"; ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let x = 0; x <= W.w; x += 20) {
+        const yy = W.waterTop + Math.sin(x * 0.03 + state.frame * 0.05) * 3;
+        if (x === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+      }
+      ctx.stroke();
+      // seabed
+      ctx.fillStyle = "#06263a"; ctx.fillRect(0, W.waterBottom, W.w, W.h - W.waterBottom);
+      ctx.strokeStyle = "rgba(120,200,255,0.15)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, W.waterBottom); ctx.lineTo(W.w, W.waterBottom); ctx.stroke();
+
+      // drifting bubbles for depth
+      ctx.fillStyle = "rgba(160,220,255,0.10)";
+      for (let i = 0; i < 22; i++) {
+        const bx = (i * 71 + state.frame * 0.6) % W.w;
+        const by = W.waterTop + ((i * 137 - state.frame * 0.9) % (W.waterBottom - W.waterTop) + (W.waterBottom - W.waterTop)) % (W.waterBottom - W.waterTop);
+        ctx.beginPath(); ctx.arc(W.w - bx, by, 2 + (i % 3), 0, 7); ctx.fill();
+      }
+
+      // --- sharks + lasers ---
+      for (const sh of state.sharks) {
+        const charging = sh.laser.state === "windup";
+        const firing = sh.laser.state === "firing";
+        // Jaws open + teeth flash while biting a swimmer.
+        const chompN = sh.chomp > 0 ? clamp(sh.chomp / CFG.shark.chomp, 0, 1) : 0;
+        Render.drawSharkSprite(ctx, sh.x, sh.y + Math.sin(sh.bob) * 2, {
+          angle: Math.PI,                 // face left
+          scale: sh.scale || 1.7,
+          tailWave: state.frame * 0.26 + sh.id,
+          tailPropel: 1,
+          laserEyes: charging || firing,
+          open: chompN > 0 ? 0.45 + chompN * 0.5 : 0   // closed normally; toothy bite when eating
+        });
+        if (charging) Render.drawWindupCharge(ctx, sh, state.frame);
+        if (firing) Render.drawSharkLaser(ctx, sh, state.frame);
+      }
+
+      // --- players (draw living on top of the dissolving dead) ---
+      const dead = state.players.filter((p) => !p.alive);
+      const living = state.players.filter((p) => p.alive);
+      for (const p of dead) Render.drawPlayer(ctx, p, state);
+      for (const p of living) Render.drawPlayer(ctx, p, state);
+
+      // --- HUD ---
+      const aliveCount = state.players.filter((p) => p.alive).length;
+      ctx.font = "bold 16px 'Segoe UI', sans-serif"; ctx.textAlign = "left";
+      ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillText(`Time ${state.t.toFixed(1)}s`, 16, 27);
+      ctx.fillStyle = "#cfe8ff"; ctx.fillText(`Time ${state.t.toFixed(1)}s`, 15, 26);
+      ctx.textAlign = "right";
+      ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillText(`Swimming: ${aliveCount}`, W.w - 15, 27);
+      ctx.fillStyle = "#cfe8ff"; ctx.fillText(`Swimming: ${aliveCount}`, W.w - 16, 26);
+    }
+  };
+
+  // ==========================================================================
+  //  INPUT  - arrow keys -> {up, down} intent for the local human player.
+  // ==========================================================================
+  const Input = {
+    _keys: { up: false, down: false },
+    attach() {
+      window.addEventListener("keydown", Input._onKey, { passive: false });
+      window.addEventListener("keyup", Input._onKey, { passive: false });
+    },
+    detach() {
+      window.removeEventListener("keydown", Input._onKey);
+      window.removeEventListener("keyup", Input._onKey);
+    },
+    _onKey(e) {
+      const down = e.type === "keydown";
+      if (e.key === "ArrowUp" || e.key === "w" || e.key === "W") { Input._keys.up = down; e.preventDefault(); }
+      else if (e.key === "ArrowDown" || e.key === "s" || e.key === "S") { Input._keys.down = down; e.preventDefault(); }
+    },
+    intent() { return { up: Input._keys.up, down: Input._keys.down }; },
+    reset() { Input._keys.up = false; Input._keys.down = false; }
+  };
+
+  // ==========================================================================
+  //  TRANSPORT  - the multiplayer seam. LocalTransport runs the sim in-tab.
+  //  A future WebSocketTransport implements the same interface:
+  //    start(config) -> void
+  //    sendInput(playerId, intent) -> void
+  //    snapshot() -> state   (latest authoritative-ish state to render)
+  //    isOver() -> bool
+  // ==========================================================================
+  function LocalTransport() {
+    let state = null;
+    const pendingInputs = {};   // playerId -> intent
+    return {
+      start(config) { state = Sim.createState(config); },
+      sendInput(playerId, intent) { pendingInputs[playerId] = intent; },
+      // Advance the local simulation one fixed tick using buffered inputs.
+      tick(dt) { if (state) Sim.step(state, pendingInputs, dt); },
+      snapshot() { return state; },
+      isOver() { return !!state && state.status === "over"; }
+    };
+  }
+
+  // ==========================================================================
+  //  MAIN  - glue everything together on a fixed timestep.
+  // ==========================================================================
+  const DEFAULT_NAMES = ["Ahmed", "Ben", "Chris", "Dana", "Eve"];
+
+  const els = {
+    names: document.getElementById("names"),
+    botCount: document.getElementById("botCount"),
+    startBtn: document.getElementById("startBtn"),
+    resetNamesBtn: document.getElementById("resetNamesBtn"),
+    setup: document.getElementById("setup"),
+    stage: document.getElementById("stage"),
+    canvas: document.getElementById("game"),
+    status: document.getElementById("status"),
+    result: document.getElementById("result"),
+    resultLead: document.getElementById("resultLead"),
+    winnerName: document.getElementById("winnerName"),
+    winnerTag: document.getElementById("winnerTag"),
+    swatch: document.getElementById("swatch"),
+    againBtn: document.getElementById("againBtn"),
+    editBtn: document.getElementById("editBtn"),
+    fsBtn: document.getElementById("fsBtn"),
+    skipBtn: document.getElementById("skipBtn")
+  };
+  const ctx = els.canvas.getContext("2d");
+
+  const game = {
+    transport: null,
+    localPlayerId: 0,
+    running: false,
+    acc: 0,
+    last: 0,
+    raf: 0,
+    lastConfig: null
+  };
+
+  function parseNames() {
+    const raw = els.names.value.split("\n").map((s) => s.trim()).filter(Boolean);
+    return raw.length ? raw : DEFAULT_NAMES.slice();
+  }
+
+  function buildPlayers(names, botCount) {
+    const players = [];
+    // human is always the first entry
+    players.push({ id: 0, name: names[0] || "You", color: PLAYER_COLORS[0], isBot: false });
+    // remaining team names become bots
+    let idx = 1;
+    for (let i = 1; i < names.length; i++) {
+      players.push({ id: idx, name: names[i], color: PLAYER_COLORS[idx % PLAYER_COLORS.length], isBot: true });
+      idx++;
+    }
+    // pad with extra practice bots if requested beyond the roster
+    const extra = clamp(botCount - (names.length - 1), 0, 12);
+    const botNames = ["Fin", "Gill", "Reef", "Coral", "Kelp", "Wave", "Splash", "Bubbles", "Marlin", "Nemo", "Pearl", "Sandy"];
+    for (let i = 0; i < extra; i++) {
+      players.push({ id: idx, name: botNames[i % botNames.length], color: PLAYER_COLORS[idx % PLAYER_COLORS.length], isBot: true });
+      idx++;
+    }
+    return players;
+  }
+
+  function startGame() {
+    const names = parseNames();
+    const botCount = clamp(parseInt(els.botCount.value, 10) || 0, 0, 10);
+    const players = buildPlayers(names, botCount);
+    const config = { players, seed: (Date.now() & 0xffffffff) };
+    game.lastConfig = { names, botCount };
+
+    game.transport = LocalTransport();
+    game.transport.start(config);
+    game.localPlayerId = 0;
+
+    els.setup.style.display = "none";
+    els.stage.classList.add("active");
+    els.result.classList.remove("show");
+    els.status.textContent = "Swim! Dodge with the arrow keys.";
+
+    Input.reset();
+    Input.attach();
+    game.running = true;
+    game.acc = 0;
+    game.last = performance.now();
+    cancelAnimationFrame(game.raf);
+    game.raf = requestAnimationFrame(loop);
+  }
+
+  function loop(now) {
+    if (!game.running) return;
+    const dt = Math.min((now - game.last) / 1000, 0.1);
+    game.last = now;
+    game.acc += dt;
+
+    // feed local input to the transport once per frame
+    game.transport.sendInput(game.localPlayerId, Input.intent());
+
+    // fixed-timestep simulation (deterministic + network-friendly)
+    let steps = 0;
+    while (game.acc >= CFG.fixedDt && steps < 6) {
+      game.transport.tick(CFG.fixedDt);
+      game.acc -= CFG.fixedDt;
+      steps++;
+    }
+
+    const state = game.transport.snapshot();
+    Render.drawState(ctx, state);
+
+    if (game.transport.isOver()) { endGame(state); return; }
+    game.raf = requestAnimationFrame(loop);
+  }
+
+  function endGame(state) {
+    game.running = false;
+    Input.detach();
+    cancelAnimationFrame(game.raf);
+
+    const winner = state.players.find((p) => p.id === state.winnerId);
+    els.status.textContent = "Round over.";
+    if (winner) {
+      els.resultLead.textContent = winner.alive
+        ? "Last one swimming - dodged every shark:"
+        : "Everyone got eaten, but the one who survived longest is:";
+      els.winnerName.textContent = winner.name;
+      els.swatch.style.background = winner.color;
+      els.winnerTag.textContent = winner.isBot
+        ? "(a bot won this time - the humans need practice!) They run the next standup."
+        : "They run the next standup!";
+    } else {
+      els.resultLead.textContent = "No winner this round.";
+      els.winnerName.textContent = "-";
+    }
+    els.result.classList.add("show");
+  }
+
+  function backToSetup() {
+    game.running = false;
+    Input.detach();
+    cancelAnimationFrame(game.raf);
+    els.result.classList.remove("show");
+    els.stage.classList.remove("active");
+    els.setup.style.display = "flex";
+  }
+
+  // --- wire up UI ---
+  els.startBtn.addEventListener("click", startGame);
+  els.againBtn.addEventListener("click", startGame);
+  els.editBtn.addEventListener("click", backToSetup);
+  els.resetNamesBtn.addEventListener("click", () => { els.names.value = DEFAULT_NAMES.join("\n"); });
+  els.skipBtn.addEventListener("click", () => {
+    if (!game.running || !game.transport) return;
+    // fast-forward the simulation to a conclusion
+    const state = game.transport.snapshot();
+    let guard = 0;
+    while (state.status !== "over" && guard < 60 * 90) { Sim.step(state, {}, CFG.fixedDt); guard++; }
+    Render.drawState(ctx, state);
+    endGame(state);
+  });
+  els.fsBtn.addEventListener("click", () => {
+    if (!document.fullscreenElement) els.stage.requestFullscreen && els.stage.requestFullscreen();
+    else document.exitFullscreen && document.exitFullscreen();
+  });
+
+  // seed default names
+  els.names.value = DEFAULT_NAMES.join("\n");
+
+  // draw an idle frame so the canvas isn't blank if opened directly
+  Render.drawState(ctx, { world: CFG.world, frame: 0, t: 0, players: [], sharks: [] });
+})();
+</script>
+</body>
+</html>
