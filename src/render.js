@@ -512,78 +512,193 @@ export const Render = {
       }
     }
 
-    // ---- Scuba diver in the player's wetsuit colour, facing right ----
-    // Fins at the back (a little kicking flutter so the swim reads).
-    const kick = Math.sin(frame * 0.35 + p.id) * 0.4;
-    ctx.fillStyle = "#2a2f36";
+    // ---- Scuba diver: black wetsuit + team colour on tank/mask/fins ----
+    //
+    // Coordinate frame: origin at the diver's centre; +X forward (right), +Y
+    // down. The diver swims horizontally facing right (the same direction the
+    // fish used to face). Sprite footprint roughly x=[-38, 30], y=[-15, 15].
+    //
+    const WETSUIT = "#141821";
+    const WETSUIT_HL = "#282f3c";      // subtle highlight on the black rubber
+    const SKIN = "#f0d2a8";
+    const MASK_GLASS = "#0a1e33";
+    const HOSE = "#22262f";
+    const ACCENT = p.color;             // tank + mask strap + fin colour
+    const ACCENT_DARK = "rgba(0,0,0,0.35)";
+    const OUTLINE = "#080a0e";
+    const kick = Math.sin(frame * 0.35 + p.id) * 3.5;
+
+    // ---- Fins (drawn first, at the back). Coloured, with a dark rib. ----
+    for (const [yOff, k] of [[-6, kick], [6, -kick]]) {
+      ctx.fillStyle = ACCENT;
+      ctx.beginPath();
+      ctx.moveTo(-22, yOff - 3);
+      ctx.quadraticCurveTo(-32, yOff - 5 + k * 0.4, -38, yOff - 8 + k * 0.6);
+      ctx.lineTo(-36, yOff + 3 + k * 0.5);
+      ctx.quadraticCurveTo(-30, yOff + 2 + k * 0.3, -22, yOff + 2);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1; ctx.stroke();
+      // Rib along the middle of the fin blade
+      ctx.strokeStyle = ACCENT_DARK; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-22, yOff);
+      ctx.quadraticCurveTo(-30, yOff - 1 + k * 0.3, -36, yOff - 2 + k * 0.5);
+      ctx.stroke();
+    }
+
+    // ---- Legs: two clearly separated shapes from hips back to the fins. ---
+    // Upper leg
+    ctx.fillStyle = WETSUIT;
     ctx.beginPath();
-    ctx.moveTo(-14, -5);
-    ctx.lineTo(-25, -10 + kick);
-    ctx.lineTo(-23, -3);
+    ctx.moveTo(-6, -8);           // hip top-front
+    ctx.lineTo(-14, -7);          // knee top
+    ctx.lineTo(-22, -5 + kick * 0.15);  // ankle top
+    ctx.lineTo(-22, -1 + kick * 0.15);  // ankle bottom
+    ctx.lineTo(-14, -3);          // knee bottom
+    ctx.lineTo(-6, -4);           // hip bottom-front
     ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1; ctx.stroke();
+    // Lower leg
+    ctx.fillStyle = WETSUIT;
     ctx.beginPath();
-    ctx.moveTo(-14, 6);
-    ctx.lineTo(-25, 12 - kick);
-    ctx.lineTo(-23, 4);
+    ctx.moveTo(-6, 4);
+    ctx.lineTo(-14, 3);
+    ctx.lineTo(-22, 1 - kick * 0.15);
+    ctx.lineTo(-22, 5 - kick * 0.15);
+    ctx.lineTo(-14, 7);
+    ctx.lineTo(-6, 8);
     ctx.closePath(); ctx.fill();
-
-    // Air tank strapped to the diver's back (drawn behind the body).
-    ctx.fillStyle = "#7c8790";
-    ctx.fillRect(-9, -8, 11, 12);
-    ctx.fillStyle = "#a4aeb6";
-    ctx.fillRect(-9, -8, 11, 2.4);        // tank cap highlight
-    ctx.strokeStyle = "#3d4650"; ctx.lineWidth = 0.8;
-    ctx.strokeRect(-9, -8, 11, 12);
-
-    // Torso / wetsuit body in the player colour.
-    ctx.fillStyle = p.color;
-    ctx.beginPath(); ctx.ellipse(2, 1, 15, 9, 0, 0, 7); ctx.fill();
-    // Belt line for a bit of tailoring.
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
-    ctx.fillRect(-8, 4, 20, 1.5);
-    // Highlight along the top of the wetsuit.
-    ctx.fillStyle = "rgba(255,255,255,0.22)";
-    ctx.beginPath(); ctx.ellipse(4, -2, 10, 3, 0, 0, 7); ctx.fill();
-
-    // Head + dive hood in the same colour.
-    ctx.fillStyle = p.color;
-    ctx.beginPath(); ctx.arc(14, -3, 5.5, 0, 7); ctx.fill();
-    // Skin patch (chin) so the head reads as a face, not a helmet.
-    ctx.fillStyle = "#f2d2a8";
-    ctx.beginPath(); ctx.arc(16, -2, 3.2, -0.6, 1.6); ctx.fill();
-
-    // Diving mask: dark strap around the head, glass panel over the eye.
-    ctx.strokeStyle = "#1a1f26"; ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.arc(14, -3, 5.2, -1.2, 1.2, false); ctx.stroke();
-    ctx.fillStyle = "#132a44";
-    ctx.beginPath(); ctx.ellipse(16, -4, 3.4, 2.5, -0.15, 0, 7); ctx.fill();
-    ctx.fillStyle = "rgba(220,240,255,0.55)";
-    ctx.beginPath(); ctx.ellipse(17, -4.6, 1.2, 0.8, 0, 0, 7); ctx.fill();
-
-    // Regulator hose from the tank to the mouth.
-    ctx.strokeStyle = "#2a2f36"; ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(2, -3);
-    ctx.quadraticCurveTo(8, -2, 12, -1);
     ctx.stroke();
-    // Mouthpiece.
-    ctx.fillStyle = "#1a1f26";
-    ctx.beginPath(); ctx.arc(13, 0, 1.1, 0, 7); ctx.fill();
+    // Knee highlight lines
+    ctx.strokeStyle = WETSUIT_HL; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(-14, -7); ctx.lineTo(-14, -3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-14, 3); ctx.lineTo(-14, 7); ctx.stroke();
 
-    // Rising bubbles from the regulator so the diver looks alive.
-    ctx.fillStyle = "rgba(210,235,255,0.85)";
-    for (let i = 0; i < 3; i++) {
-      const life = ((frame * 0.4) + i * 8) % 24;
-      const bx = 14 + Math.sin(life * 0.4 + i) * 1.6;
-      const by = -6 - life * 0.6;
-      const br = 1.4 - life * 0.03;
+    // ---- Torso (elongated body of the wetsuit) ----
+    ctx.fillStyle = WETSUIT;
+    ctx.beginPath();
+    ctx.ellipse(-1, 0, 14, 9, 0, 0, 7);
+    ctx.fill();
+    ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1; ctx.stroke();
+    // Chest highlight
+    ctx.fillStyle = WETSUIT_HL;
+    ctx.beginPath(); ctx.ellipse(0, -3, 9, 2.2, 0, 0, 7); ctx.fill();
+    // Belt / weight harness
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(-11, 6, 22, 1.8);
+
+    // ---- Air tank on the back (coloured, clearly visible above the torso) --
+    // The tank sits on the diver's back; in this side view it reads as a
+    // rectangle above the torso.
+    ctx.fillStyle = ACCENT;
+    ctx.beginPath();
+    ctx.moveTo(-8, -14);
+    ctx.lineTo(5, -14);
+    ctx.quadraticCurveTo(7, -14, 7, -12);
+    ctx.lineTo(7, -6);
+    ctx.quadraticCurveTo(7, -4, 5, -4);
+    ctx.lineTo(-8, -4);
+    ctx.quadraticCurveTo(-10, -4, -10, -6);
+    ctx.lineTo(-10, -12);
+    ctx.quadraticCurveTo(-10, -14, -8, -14);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1; ctx.stroke();
+    // Colour band across the tank for contrast
+    ctx.fillStyle = ACCENT_DARK;
+    ctx.fillRect(-10, -9, 17, 1.6);
+    // Tank cap (silver) and valve
+    ctx.fillStyle = "#c8ccd0";
+    ctx.fillRect(4, -14, 3, 4);
+    ctx.fillStyle = "#a0a4a8";
+    ctx.fillRect(-1, -16, 3, 2.5);
+    // Tank straps wrapping over the torso
+    ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(-4, -4); ctx.lineTo(-4, 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(2, -4); ctx.lineTo(2, 8); ctx.stroke();
+
+    // ---- Arms: two clearly separated arms reaching forward ----
+    // Upper arm (further from viewer)
+    ctx.fillStyle = WETSUIT;
+    ctx.beginPath();
+    ctx.moveTo(6, -6);            // shoulder top
+    ctx.lineTo(16, -6);           // elbow top
+    ctx.lineTo(24, -3);           // wrist top
+    ctx.lineTo(24, -0.5);         // wrist bottom
+    ctx.lineTo(16, -3);           // elbow bottom
+    ctx.lineTo(6, -3);            // shoulder bottom
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1; ctx.stroke();
+    // Lower arm (nearer to viewer)
+    ctx.fillStyle = WETSUIT;
+    ctx.beginPath();
+    ctx.moveTo(6, 2);
+    ctx.lineTo(16, 2);
+    ctx.lineTo(24, 4);
+    ctx.lineTo(24, 6.5);
+    ctx.lineTo(16, 5);
+    ctx.lineTo(6, 5);
+    ctx.closePath(); ctx.fill();
+    ctx.stroke();
+    // Elbow highlights
+    ctx.strokeStyle = WETSUIT_HL; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(16, -6); ctx.lineTo(16, -3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(16, 2); ctx.lineTo(16, 5); ctx.stroke();
+    // Hands (skin, gripped together in a streamlined swim pose)
+    ctx.fillStyle = SKIN;
+    ctx.beginPath(); ctx.arc(26, -1.5, 2.2, 0, 7); ctx.fill();
+    ctx.strokeStyle = OUTLINE; ctx.lineWidth = 0.7; ctx.stroke();
+    ctx.fillStyle = SKIN;
+    ctx.beginPath(); ctx.arc(26, 5, 2.2, 0, 7); ctx.fill();
+    ctx.stroke();
+
+    // ---- Head: black neoprene hood with face + mask ----
+    ctx.fillStyle = WETSUIT;
+    ctx.beginPath(); ctx.arc(15, -6, 8, 0, 7); ctx.fill();       // hood
+    ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1; ctx.stroke();
+    // Face opening (skin visible around the mask/mouth area)
+    ctx.fillStyle = SKIN;
+    ctx.beginPath(); ctx.arc(19, -5, 5.2, -1.2, 1.4); ctx.fill();
+
+    // Mask strap in the player colour (visible band around the hood)
+    ctx.strokeStyle = ACCENT; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.arc(15, -6, 8.2, -0.5, 0.55, false); ctx.stroke();
+    ctx.strokeStyle = OUTLINE; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(15, -6, 8.2, -0.5, 0.55, false); ctx.stroke();
+
+    // Mask glass panel (dark blue-black) with a highlight
+    ctx.fillStyle = MASK_GLASS;
+    ctx.beginPath(); ctx.ellipse(21, -7, 4.2, 3.2, -0.15, 0, 7); ctx.fill();
+    ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = "rgba(220,240,255,0.55)";
+    ctx.beginPath(); ctx.ellipse(22, -8, 1.6, 1, 0, 0, 7); ctx.fill();
+
+    // Regulator hose from the tank valve to the mouth
+    ctx.strokeStyle = HOSE; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -13);
+    ctx.quadraticCurveTo(8, -8, 15, -2);
+    ctx.stroke();
+    // Mouthpiece
+    ctx.fillStyle = OUTLINE;
+    ctx.beginPath(); ctx.arc(16, -1.5, 1.5, 0, 7); ctx.fill();
+
+    // Rising bubbles from the regulator
+    ctx.fillStyle = "rgba(210,235,255,0.9)";
+    for (let i = 0; i < 4; i++) {
+      const life = ((frame * 0.4) + i * 8) % 28;
+      const bx = 17 + Math.sin(life * 0.3 + i) * 2;
+      const by = -8 - life * 0.7;
+      const br = 1.8 - life * 0.045;
       if (br > 0.4) { ctx.beginPath(); ctx.arc(bx, by, br, 0, 7); ctx.fill(); }
     }
 
-    // Dead marker: red X over the mask glass.
+    // Dead marker: red X over the mask glass
     if (!p.alive) {
-      ctx.strokeStyle = "#a01522"; ctx.lineWidth = 1.4;
-      ctx.beginPath(); ctx.moveTo(14, -5.6); ctx.lineTo(18, -2.4); ctx.moveTo(18, -5.6); ctx.lineTo(14, -2.4); ctx.stroke();
+      ctx.strokeStyle = "#c81a2a"; ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(17.5, -10); ctx.lineTo(24.5, -4);
+      ctx.moveTo(24.5, -10); ctx.lineTo(17.5, -4);
+      ctx.stroke();
     }
     ctx.restore();
 
