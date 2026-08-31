@@ -98,12 +98,17 @@ export const Render = {
       ctx.moveTo(8, 0.6);
       ctx.quadraticCurveTo(15, g * 0.25, 24, g);
       ctx.stroke();
-      // small teeth on the inner lip, clipped so they stay inside the body
+      // Teeth on the inner lip, clipped inside the body. The range is chosen
+      // to line the mouth OPENING - starting past the eye (which sits at
+      // x=13, radius 1.8) so no tooth ever covers the eye, and ending at
+      // the mouth's front tip.
       ctx.fillStyle = "#f2eee4";
-      const n = 4;
+      const n = 5;
+      const TEETH_START = 16;    // past the eye
+      const TEETH_END   = 25;    // at the mouth tip
       for (let i = 0; i < n; i++) {
-        const t = (i + 0.45) / n;
-        const fx = lerp(10, 21.5, t);
+        const t = (i + 0.5) / n;
+        const fx = lerp(TEETH_START, TEETH_END, t);
         const upY = lerp(-1.1, -g + 0.5, t);
         const loY = lerp(1.1, g - 0.5, t);
         const th = 1.5 + open * 1.1;
@@ -149,8 +154,7 @@ export const Render = {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(cf.x, cf.y);
-    // Gentle sinking wobble so the drop feels like it's tumbling.
-    ctx.rotate(Math.sin((cf.spawnT + state.t) * 1.6 + cf.id) * 0.06);
+    // Coffin stays put (no sink, no rotate) - a still marker at the death spot.
 
     // Coffin silhouette - proper elongated hexagon: narrow head + foot,
     // widening at the shoulders. Traditional "toe-pincher" coffin shape.
@@ -166,34 +170,34 @@ export const Render = {
     //
     ctx.fillStyle = "#5b3a1c";
     ctx.beginPath();
-    ctx.moveTo(-4, -17);      // head top-left
-    ctx.lineTo(4, -17);       // head top-right
-    ctx.lineTo(8, -9);        // shoulder right-upper
-    ctx.lineTo(8, 9);         // shoulder right-lower
-    ctx.lineTo(4, 17);        // foot bottom-right
-    ctx.lineTo(-4, 17);       // foot bottom-left
-    ctx.lineTo(-8, 9);        // shoulder left-lower
-    ctx.lineTo(-8, -9);       // shoulder left-upper
+    ctx.moveTo(-5, -21);      // head top-left
+    ctx.lineTo(5, -21);       // head top-right
+    ctx.lineTo(10, -11);      // shoulder right-upper
+    ctx.lineTo(10, 11);       // shoulder right-lower
+    ctx.lineTo(5, 21);        // foot bottom-right
+    ctx.lineTo(-5, 21);       // foot bottom-left
+    ctx.lineTo(-10, 11);      // shoulder left-lower
+    ctx.lineTo(-10, -11);     // shoulder left-upper
     ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = "#2f1f10"; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.strokeStyle = "#2f1f10"; ctx.lineWidth = 1.3; ctx.stroke();
 
     // Lid seams (top + bottom bevels).
-    ctx.strokeStyle = "#3d2510"; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.moveTo(-4, -17); ctx.lineTo(-8, -9); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(4, -17); ctx.lineTo(8, -9); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-8, 9); ctx.lineTo(-4, 17); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(8, 9); ctx.lineTo(4, 17); ctx.stroke();
+    ctx.strokeStyle = "#3d2510"; ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.moveTo(-5, -21); ctx.lineTo(-10, -11); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(5, -21); ctx.lineTo(10, -11); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-10, 11); ctx.lineTo(-5, 21); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(10, 11); ctx.lineTo(5, 21); ctx.stroke();
 
     // Cross on the lid, upper third (traditional placement).
     ctx.fillStyle = "#e8dfcc";
-    ctx.fillRect(-1, -12, 2, 12);
-    ctx.fillRect(-3.5, -8, 7, 2.2);
+    ctx.fillRect(-1.2, -15, 2.4, 14);
+    ctx.fillRect(-4, -10, 8, 2.4);
 
     // Small colour dot in the player's colour (foot end) so party rounds can
-    // see whose coffin sank where.
+    // see whose coffin sits where.
     if (cf.color) {
       ctx.fillStyle = cf.color;
-      ctx.beginPath(); ctx.arc(0, 12, 1.6, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 15, 1.8, 0, 7); ctx.fill();
     }
 
     ctx.restore();
@@ -208,9 +212,14 @@ export const Render = {
     ctx.save();
     ctx.translate(r.x, r.y);
 
-    // Soft shadow on the sand right below the ray.
-    ctx.fillStyle = "rgba(0,0,0,0.28)";
-    ctx.beginPath(); ctx.ellipse(0, 22, S.bodyRX * s * 0.9, 3.2, 0, 0, 7); ctx.fill();
+    // Soft shadow on the sand - only draw when the ray is close enough to the
+    // seabed for a shadow to actually land there. Fades in as it approaches.
+    const sandY = CFG.world.waterBottom;
+    const shadowFade = Math.max(0, 1 - (sandY - r.y) / 60);   // 0 at 60px above sand, 1 at sand
+    if (shadowFade > 0) {
+      ctx.fillStyle = "rgba(0,0,0," + (0.32 * shadowFade).toFixed(2) + ")";
+      ctx.beginPath(); ctx.ellipse(0, sandY - r.y + 2, S.bodyRX * s * 0.9, 3.2, 0, 0, 7); ctx.fill();
+    }
 
     // Body - a flat kite. Two ellipses give the diamond silhouette.
     ctx.fillStyle = "#453b30";
@@ -306,6 +315,18 @@ export const Render = {
   drawAnchor(ctx, a, frame) {
     const s = a.scale;
     const W = CFG.world;
+
+    // Chain: straight vertical line from the anchor's ring up to the surface.
+    // Represents the length of chain paid out from the boat that dropped it.
+    const chainTop = W.waterTop;
+    const ringWorldY = a.y - 18 * s;   // ring position in world coords (matches art below)
+    if (ringWorldY > chainTop) {
+      ctx.strokeStyle = "#2a2016"; ctx.lineWidth = 2.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(a.x, chainTop); ctx.lineTo(a.x, ringWorldY); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
     ctx.save();
     ctx.translate(a.x, a.y);
     ctx.scale(s, s);
@@ -324,29 +345,32 @@ export const Render = {
     // Shaft straight down.
     ctx.fillStyle = "#6b573f";
     ctx.beginPath();
-    ctx.moveTo(-2.4, -13); ctx.lineTo(2.4, -13); ctx.lineTo(2.4, 12); ctx.lineTo(-2.4, 12);
+    ctx.moveTo(-2.4, -13); ctx.lineTo(2.4, -13); ctx.lineTo(2.4, 14); ctx.lineTo(-2.4, 14);
     ctx.closePath(); ctx.fill();
     ctx.strokeStyle = "#3a2f22"; ctx.lineWidth = 1; ctx.stroke();
 
-    // Two curved flukes at the bottom, cartoon-thick.
+    // Crown at the bottom of the shaft (a small bulge).
     ctx.fillStyle = "#5b4a35";
-    ctx.beginPath();
-    ctx.moveTo(-2, 10);
-    ctx.quadraticCurveTo(-18, 12, -20, 22);
-    ctx.quadraticCurveTo(-11, 18, -2, 16);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = "#2a1e12"; ctx.lineWidth = 1; ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(2, 10);
-    ctx.quadraticCurveTo(18, 12, 20, 22);
-    ctx.quadraticCurveTo(11, 18, 2, 16);
-    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 14, 3.5, 0, 7); ctx.fill();
     ctx.strokeStyle = "#2a1e12"; ctx.lineWidth = 1; ctx.stroke();
 
-    // Fluke tips - small triangular barbs.
+    // Two curved flukes - attach at the crown, sweep OUT and DOWN, then curl
+    // UP so the pointed tips end above the crown line (proper anchor shape).
+    ctx.fillStyle = "#5b4a35";
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(0, 12);                                          // crown attach top
+      ctx.quadraticCurveTo(side * 6, 22, side * 18, 20);           // out and down along the palm
+      ctx.quadraticCurveTo(side * 22, 12, side * 16, 6);           // up and back to the pointed tip
+      ctx.quadraticCurveTo(side * 8, 12, 0, 15);                    // back to the crown
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "#2a1e12"; ctx.lineWidth = 1; ctx.stroke();
+    }
+
+    // Pointed fluke tips (highlight the up-facing points).
     ctx.fillStyle = "#7a6647";
-    ctx.beginPath(); ctx.moveTo(-20, 22); ctx.lineTo(-22, 19); ctx.lineTo(-18, 19); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(20, 22); ctx.lineTo(22, 19); ctx.lineTo(18, 19); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-16, 6); ctx.lineTo(-19, 3); ctx.lineTo(-14, 3); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(16, 6); ctx.lineTo(19, 3); ctx.lineTo(14, 3); ctx.closePath(); ctx.fill();
 
     ctx.restore();
 
@@ -360,6 +384,54 @@ export const Render = {
         const py = W.waterTop - Math.abs(i) * 3;
         ctx.beginPath(); ctx.arc(px, py, 3, 0, 7); ctx.fill();
       }
+    }
+  },
+
+  drawBoat(ctx, b, state) {
+    const B = CFG.boat;
+    const W = CFG.world;
+    ctx.save();
+    ctx.translate(b.x, W.waterTop);
+    // Small drifting bob so the boat feels alive on the surface.
+    ctx.rotate(Math.sin(state.frame * 0.03 + b.id) * 0.02);
+
+    // Hull: bottom below the water, tapered "V" cross-section. Only a strip
+    // of the hull sits below the surface so the player sees it moving through
+    // the top of the water rather than the full boat outline.
+    const w = B.hullW, h = B.hullH;
+    // Hull below water
+    ctx.fillStyle = "#4a2f18";
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, 0);
+    ctx.lineTo(w / 2, 0);
+    ctx.quadraticCurveTo(w / 2 - 8, h * 0.7, w / 2 - 16, h);
+    ctx.lineTo(-w / 2 + 16, h);
+    ctx.quadraticCurveTo(-w / 2 + 8, h * 0.7, -w / 2, 0);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#20130a"; ctx.lineWidth = 1.2; ctx.stroke();
+
+    // Waterline plank highlight
+    ctx.fillStyle = "#6b3f1f";
+    ctx.fillRect(-w / 2 + 2, -2, w - 4, 4);
+
+    // Deck stripe (above water) for a sliver of contrast.
+    ctx.fillStyle = "#8b5a2b";
+    ctx.fillRect(-w / 2 + 6, -6, w - 12, 4);
+
+    // A tiny anchor winch on the deck near the drop side so the "boat drops
+    // the anchor" reading is unambiguous. Placed at the LEFT (the boat is
+    // moving left and drops the anchor as it passes over the target).
+    ctx.fillStyle = "#3a2f22";
+    ctx.fillRect(-w * 0.25 - 3, -10, 6, 5);
+
+    ctx.restore();
+
+    // A little "wake" splash trailing behind the boat as it moves left.
+    ctx.fillStyle = "rgba(220,240,255,0.35)";
+    for (let i = 0; i < 3; i++) {
+      const wx = b.x + w * 0.5 + i * 6;
+      const wy = W.waterTop + Math.sin(state.frame * 0.15 + i) * 1.5;
+      ctx.beginPath(); ctx.arc(wx, wy, 2, 0, 7); ctx.fill();
     }
   },
 
@@ -440,18 +512,78 @@ export const Render = {
       }
     }
 
-    // body (a little swimmer fish in the player's colour)
+    // ---- Scuba diver in the player's wetsuit colour, facing right ----
+    // Fins at the back (a little kicking flutter so the swim reads).
+    const kick = Math.sin(frame * 0.35 + p.id) * 0.4;
+    ctx.fillStyle = "#2a2f36";
+    ctx.beginPath();
+    ctx.moveTo(-14, -5);
+    ctx.lineTo(-25, -10 + kick);
+    ctx.lineTo(-23, -3);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-14, 6);
+    ctx.lineTo(-25, 12 - kick);
+    ctx.lineTo(-23, 4);
+    ctx.closePath(); ctx.fill();
+
+    // Air tank strapped to the diver's back (drawn behind the body).
+    ctx.fillStyle = "#7c8790";
+    ctx.fillRect(-9, -8, 11, 12);
+    ctx.fillStyle = "#a4aeb6";
+    ctx.fillRect(-9, -8, 11, 2.4);        // tank cap highlight
+    ctx.strokeStyle = "#3d4650"; ctx.lineWidth = 0.8;
+    ctx.strokeRect(-9, -8, 11, 12);
+
+    // Torso / wetsuit body in the player colour.
     ctx.fillStyle = p.color;
-    ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(-26, -9); ctx.lineTo(-26, 9); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(0, 0, 18, 13, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.beginPath(); ctx.ellipse(2, 4, 12, 5, 0, 0, 7); ctx.fill();
-    // eye (looking right, the way it swims)
-    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(9, -3, 4, 0, 7); ctx.fill();
-    ctx.fillStyle = "#0b1522"; ctx.beginPath(); ctx.arc(10.5, -3, 2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(2, 1, 15, 9, 0, 0, 7); ctx.fill();
+    // Belt line for a bit of tailoring.
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect(-8, 4, 20, 1.5);
+    // Highlight along the top of the wetsuit.
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.beginPath(); ctx.ellipse(4, -2, 10, 3, 0, 0, 7); ctx.fill();
+
+    // Head + dive hood in the same colour.
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(14, -3, 5.5, 0, 7); ctx.fill();
+    // Skin patch (chin) so the head reads as a face, not a helmet.
+    ctx.fillStyle = "#f2d2a8";
+    ctx.beginPath(); ctx.arc(16, -2, 3.2, -0.6, 1.6); ctx.fill();
+
+    // Diving mask: dark strap around the head, glass panel over the eye.
+    ctx.strokeStyle = "#1a1f26"; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(14, -3, 5.2, -1.2, 1.2, false); ctx.stroke();
+    ctx.fillStyle = "#132a44";
+    ctx.beginPath(); ctx.ellipse(16, -4, 3.4, 2.5, -0.15, 0, 7); ctx.fill();
+    ctx.fillStyle = "rgba(220,240,255,0.55)";
+    ctx.beginPath(); ctx.ellipse(17, -4.6, 1.2, 0.8, 0, 0, 7); ctx.fill();
+
+    // Regulator hose from the tank to the mouth.
+    ctx.strokeStyle = "#2a2f36"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(2, -3);
+    ctx.quadraticCurveTo(8, -2, 12, -1);
+    ctx.stroke();
+    // Mouthpiece.
+    ctx.fillStyle = "#1a1f26";
+    ctx.beginPath(); ctx.arc(13, 0, 1.1, 0, 7); ctx.fill();
+
+    // Rising bubbles from the regulator so the diver looks alive.
+    ctx.fillStyle = "rgba(210,235,255,0.85)";
+    for (let i = 0; i < 3; i++) {
+      const life = ((frame * 0.4) + i * 8) % 24;
+      const bx = 14 + Math.sin(life * 0.4 + i) * 1.6;
+      const by = -6 - life * 0.6;
+      const br = 1.4 - life * 0.03;
+      if (br > 0.4) { ctx.beginPath(); ctx.arc(bx, by, br, 0, 7); ctx.fill(); }
+    }
+
+    // Dead marker: red X over the mask glass.
     if (!p.alive) {
-      ctx.strokeStyle = "#0b1522"; ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(7, -5); ctx.lineTo(12, -1); ctx.moveTo(12, -5); ctx.lineTo(7, -1); ctx.stroke();
+      ctx.strokeStyle = "#a01522"; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(14, -5.6); ctx.lineTo(18, -2.4); ctx.moveTo(18, -5.6); ctx.lineTo(14, -2.4); ctx.stroke();
     }
     ctx.restore();
 
@@ -708,6 +840,11 @@ export const Render = {
       const bx = (i * 71 + state.frame * 0.6) % W.w;
       const by = W.waterTop + ((i * 137 - state.frame * 0.9) % (W.waterBottom - W.waterTop) + (W.waterBottom - W.waterTop)) % (W.waterBottom - W.waterTop);
       ctx.beginPath(); ctx.arc(W.w - bx, by, 2 + (i % 3), 0, 7); ctx.fill();
+    }
+
+    // --- boats crossing the surface (drawn first so hazards can overlap) ---
+    if (state.boats) {
+      for (const b of state.boats) Render.drawBoat(ctx, b, state);
     }
 
     // --- coffins (behind hazards so they don't obscure gameplay) ---

@@ -65,7 +65,7 @@ test('invuln ticks down each step and expires', () => {
   assert.equal(p.invuln, 0, 'invuln should have fully expired');
 });
 
-test('a lost life drops a coffin at the player position that sinks toward the seabed', () => {
+test('a lost life drops a coffin at the player position and it stays there', () => {
   const s = Sim.createState({ seed: 1, mode: 'solo', lives: 2, players: [{ name: 'A' }] });
   const p = s.players[0];
   const py = p.y;
@@ -74,7 +74,19 @@ test('a lost life drops a coffin at the player position that sinks toward the se
   const cf = s.coffins[0];
   assert.equal(cf.x, p.x);
   assert.equal(cf.y, py);
-  const startY = cf.y;
-  for (let i = 0; i < 60; i++) Sim.step(s, { 0: { up: 0, down: 0 } }, 1 / 60);
-  assert.ok(s.coffins[0].y > startY, 'coffin should have sunk');
+  const startX = cf.x, startY = cf.y;
+  // Tick some frames - coffin should NOT move (it stays at the death spot).
+  for (let i = 0; i < 30; i++) Sim.step(s, { 0: { up: 0, down: 0 } }, 1 / 60);
+  assert.equal(s.coffins[0].x, startX, 'coffin should not drift');
+  assert.equal(s.coffins[0].y, startY, 'coffin should not sink');
+});
+
+test('coffin culled once its lifetime expires', () => {
+  const s = Sim.createState({ seed: 1, mode: 'solo', lives: 2, players: [{ name: 'A' }] });
+  const p = s.players[0];
+  Sim._kill(s, p, 'eaten', 0, 0);
+  assert.equal(s.coffins.length, 1);
+  // Fast-forward past the coffin's lifetime.
+  for (let i = 0; i < 60 * 5; i++) Sim.step(s, { 0: { up: 0, down: 0 } }, 1 / 60);
+  assert.equal(s.coffins.length, 0, 'coffin should be culled after lifetime');
 });

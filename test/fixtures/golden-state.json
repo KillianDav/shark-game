@@ -313,19 +313,20 @@
       }
     }
   ],
+  "boats": [],
   "anchors": [],
   "coffins": [
     {
       "id": 3,
       "x": 298,
       "y": 685,
-      "vy": 130,
       "color": "#c084fc",
       "spawnT": 14.466667
     }
   ],
   "nextSharkId": 13,
   "nextStingrayId": 2,
+  "nextBoatId": 1,
   "nextAnchorId": 1,
   "nextCoffinId": 4,
   "spawnTimer": 0.311917,

@@ -84,22 +84,29 @@ export const CFG = {
     strikeUp: 44, strikeAhead: 18 // tail-tip offset relative to body during strike (up + slightly forward)
   },
   coffin: {
-    // Cartoon coffin dropped at the death spot when a life is lost. Sinks
-    // to the seabed and lingers as a visible mark, then fades out.
-    fallSpeed: 130,         // px/s downward while sinking (falls quickly)
-    fadeStart: 2.5,         // seconds from spawn before fading begins
-    lifetime: 4.0           // seconds after spawn until the coffin is culled
+    // Cartoon coffin dropped at the death spot when a life is lost. Stays
+    // put at the death location for a couple of seconds then fades out - no
+    // sinking, so the player can clearly see where they lost the life.
+    fadeStart: 1.6,         // seconds from spawn before fading begins
+    lifetime: 2.5           // seconds after spawn until the coffin is culled
   },
   anchor: {
-    // Rare falling anchor. Drops through the water from the surface at a
-    // random x near the player lane. Lethal ONLY on direct body-overlap - a
-    // near-miss to the left or right passes harmlessly.
+    // Rare falling anchor, preceded by a boat visibly crossing the water
+    // surface. The boat picks a mid-screen drop point so the player sees the
+    // anchor coming and has time to dodge in Y. Lethal ONLY on direct body-
+    // overlap - a near-miss to the side passes harmlessly.
     earliestT: 12,                // no anchors early game
     spawnMin: 8, spawnMax: 16,    // steady cadence with randomness
     minSpeed: 70, maxSpeed: 110,  // slower fall so the player has time to dodge
-    spawnJitter: 60,              // half-width of the horizontal spawn band around the lane
+    dropMinX: 320, dropMaxX: 1000, // horizontal band where the boat drops (mid-screen)
     bodyRadius: 20,               // effective anchor hitbox radius (paired with player rx/ry)
     scaleMin: 1.8, scaleMax: 2.2  // bigger, more menacing anchor
+  },
+  boat: {
+    // Simple hull that crosses the top of the water and releases an anchor at
+    // its targetX. Purely a visual telegraph for the anchor spawn.
+    speed: 55,                    // px/s leftward drift
+    hullW: 90, hullH: 22          // sprite footprint, drawn straddling waterTop
   },
   // Gentle, shared speed-up applied to BOTH shark travel speed and player
   // vertical agility, so the tempo rises but dodging stays just as feasible.
@@ -223,10 +230,12 @@ export const Sim = {
       players,
       sharks: [],
       stingrays: [],
+      boats: [],
       anchors: [],
       coffins: [],
       nextSharkId: 1,
       nextStingrayId: 1,
+      nextBoatId: 1,
       nextAnchorId: 1,
       nextCoffinId: 1,
       spawnTimer: 0.8,                          // shark spawn cadence
@@ -333,17 +342,30 @@ export const Sim = {
     return { x: r.x + R.strikeAhead * r.scale, y: r.y - R.strikeUp * r.scale };
   },
 
-  _spawnAnchor(state) {
-    const A = state.diff.anchor, rng = state.rng, W = CFG.world;
+  // Spawn a boat crossing the top of the water. When it reaches its targetX
+  // it drops an anchor beneath itself via `_spawnAnchor`. The boat is purely
+  // a visual telegraph so the player sees the anchor coming.
+  _spawnBoat(state) {
+    const B = CFG.boat, A = state.diff.anchor, rng = state.rng, W = CFG.world;
+    const targetX = lerp(A.dropMinX, A.dropMaxX, rng());
+    state.boats.push({
+      id: state.nextBoatId++,
+      x: W.w + B.hullW * 0.5,          // enter from off-screen right
+      y: W.waterTop,                    // hull straddles the surface
+      vx: -B.speed,
+      targetX,
+      dropped: false,                   // becomes true once the anchor is released
+      scale: 1.0
+    });
+  },
+
+  _spawnAnchor(state, x, y) {
+    const A = state.diff.anchor, rng = state.rng;
     const vy = lerp(A.minSpeed, A.maxSpeed, rng()) * Sim._speedMul(state, state.t);
-    // Drop within a horizontal band around the player lane so anchors are
-    // dodgeable in Y but actually threaten someone (an anchor over empty water
-    // would just be scenery).
-    const x = W.laneX + (rng() * 2 - 1) * A.spawnJitter;
     const scale = lerp(A.scaleMin, A.scaleMax, rng());
     state.anchors.push({
       id: state.nextAnchorId++,
-      x, y: W.waterTop - 10,   // start just above the surface
+      x, y,
       vy,
       scale,
       splash: 0.35              // seconds of surface splash on entry (visual only)
@@ -426,14 +448,25 @@ export const Sim = {
       }
     }
 
-    // --- spawn falling anchors on their own timer ---
+    // --- spawn a BOAT on the anchor timer; boat drops the anchor later ---
     if (state.hazards !== "sharks-only" && state.t >= A.earliestT) {
       state.anchorSpawnTimer -= dt;
       if (state.anchorSpawnTimer <= 0) {
-        Sim._spawnAnchor(state);
+        Sim._spawnBoat(state);
         state.anchorSpawnTimer = lerp(A.spawnMin, A.spawnMax, state.rng());
       }
     }
+
+    // --- move boats + release anchor when over the drop point ---
+    for (const b of state.boats) {
+      b.x += b.vx * dt;
+      if (!b.dropped && b.x <= b.targetX) {
+        Sim._spawnAnchor(state, b.x, CFG.world.waterTop - 6);
+        b.dropped = true;
+      }
+    }
+    // Cull once fully off-screen left.
+    state.boats = state.boats.filter((b) => b.x > -CFG.boat.hullW);
 
     // --- move sharks + drive their lasers ---
     for (const sh of state.sharks) {
@@ -482,12 +515,8 @@ export const Sim = {
     }
     state.stingrays = state.stingrays.filter((r) => r.x > -80);
 
-    // --- sink coffins toward the seabed, then cull once their lifetime ends ---
+    // --- coffins stay put at the death spot and cull after their lifetime ---
     const C = CFG.coffin;
-    for (const cf of state.coffins) {
-      if (cf.y < W.waterBottom - 10) cf.y += cf.vy * dt;
-      else cf.y = W.waterBottom - 10;
-    }
     state.coffins = state.coffins.filter((cf) => (state.t - cf.spawnT) < C.lifetime);
 
     // --- move anchors (straight-down drop) ---
@@ -620,7 +649,6 @@ export const Sim = {
     state.coffins.push({
       id: state.nextCoffinId++,
       x: p.x, y: p.y,
-      vy: CFG.coffin.fallSpeed,
       color: p.color,        // small colour flash on the lid so you can tell who died
       spawnT: state.t
     });
