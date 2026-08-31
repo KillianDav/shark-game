@@ -1,0 +1,11 @@
+{
+  "name": "shark-game",
+  "version": "0.1.0",
+  "description": "Standup Shark - dodge the laser sharks; last swimmer runs the standup.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "serve": "python -m http.server 8912 --bind 127.0.0.1"
+  }
+}
