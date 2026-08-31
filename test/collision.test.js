@@ -13,6 +13,7 @@ function stateWithOneShark(sharkOverrides = {}) {
     players: [{ id: 0, name: 'A', isBot: false }]
   });
   state.spawnTimer = 1e6;   // suppress spawning during the test
+  state.players[0].lives = 1;   // pin to one-shot so a single hit resolves the collision assertion
   const scale = 1.6;
   state.sharks = [{
     id: 1,

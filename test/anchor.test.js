@@ -14,6 +14,7 @@ function stateWithOneAnchor(overrides = {}) {
   });
   s.spawnTimer = 1e6;
   s.anchorSpawnTimer = 1e6;
+  s.players[0].lives = 1;   // one-shot so a single hit resolves the assertion
   s.anchors = [{
     id: 1,
     x: s.players[0].x,     // directly over the player

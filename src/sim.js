@@ -27,7 +27,13 @@ export const CFG = {
   // Players hold station in a lane and dodge vertically - everyone "swims" at
   // the same speed, so there is no finish line: last one swimming wins.
   world: { w: 1280, h: 720, waterTop: 96, waterBottom: 700, laneX: 250, scrollSpeed: 60 },
-  player: { accY: 1400, dampY: 7.5, maxVy: 300, rx: 20, ry: 15 },
+  player: {
+    accY: 1400, dampY: 7.5, maxVy: 300, rx: 20, ry: 15,
+    // Lives: solo gets 3 attempts (respawn in place after each death); party
+    // stays one-shot (last swimmer wins - lives would defeat the picker rules).
+    livesSolo: 3, livesParty: 1,
+    invulnDur: 1.5   // seconds of i-frames after losing a life
+  },
   shark: {
     minSpeed: 175, maxSpeed: 285,
     spawnStart: 2.0,   // seconds between spawns at t=0 (few sharks to start)
@@ -98,6 +104,8 @@ export const Sim = {
     const seed = (config && config.seed) || (Date.now() & 0xffffffff);
     const rng = makeRng(seed);
     const W = CFG.world;
+    const mode = config.mode || "party";
+    const initialLives = mode === "solo" ? CFG.player.livesSolo : CFG.player.livesParty;
     const players = (config.players || []).map((p, i) => ({
       id: p.id != null ? p.id : i,
       name: p.name,
@@ -107,8 +115,10 @@ export const Sim = {
       y: lerp(CFG.world.waterTop + 60, CFG.world.waterBottom - 60, (i + 1) / ((config.players.length) + 1)),
       vy: 0,
       alive: true,
+      lives: initialLives,          // remaining lives (final death sets alive=false)
+      invuln: 0,                    // seconds of i-frames remaining after losing a life
       deathT: null,
-      deathKind: null,   // "eaten" | "laser"
+      deathKind: null,              // "eaten" | "laser" | "stung" | "anchor"
       deathX: 0, deathY: 0,
       botBias: rng() * 0.6 - 0.3,      // per-bot steering personality
       botReact: 0.45 + rng() * 0.5     // per-bot detection range factor
@@ -130,7 +140,7 @@ export const Sim = {
 
     return {
       seed, rng,
-      mode: config.mode || "party",       // "party" | "solo"
+      mode,                                // "party" | "solo"
       hazards: config.hazards || "all",   // "all" (sharks + stingrays + anchors) | "sharks-only" (classic)
       decor,
       t: 0, frame: 0,
@@ -404,6 +414,7 @@ export const Sim = {
     // --- move players (vertical dodging only; they hold their lane) ---
     for (const p of state.players) {
       if (!p.alive) continue;
+      if (p.invuln > 0) p.invuln = Math.max(0, p.invuln - dt);
       const intent = p.isBot ? Sim._botIntent(state, p) : (humanInputs[p.id] || { up: false, down: false });
       let acc = 0;
       if (intent.up) acc -= P.accY * m;
@@ -491,7 +502,19 @@ export const Sim = {
   },
 
   _kill(state, p, kind, x, y) {
+    // I-frames after a recent respawn absorb the hit outright.
+    if (p.invuln > 0) return;
+    // Solo lives: spend one and keep playing from the same spot with a brief
+    // window of invulnerability so the same hazard doesn't insta-kill again.
+    if (p.lives > 1) {
+      p.lives -= 1;
+      p.invuln = CFG.player.invulnDur;
+      p.vy = 0;                    // clean slate for dodging on respawn
+      p.deathKind = kind;           // last hit kind, used by the renderer for flash colour
+      return;
+    }
     p.alive = false;
+    p.lives = 0;
     p.deathT = state.t;
     p.deathKind = kind;
     p.deathX = x; p.deathY = y;

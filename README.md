@@ -27,9 +27,12 @@ Pick a mode on the setup screen:
 - **Party** — the **first name** in the team list is you (keyboard-controlled)
   and every other name becomes an AI bot swimmer. "Practice bots" adds extra AI
   swimmers. The last one still swimming wins and runs the next standup.
-- **Solo survival** — you swim alone until you die. The HUD shows the live
-  difficulty (size tier, tempo multiplier, shark + ray counts) and the result
-  reports how long you lasted — ideal for testing the difficulty curve.
+- **Solo survival** — you swim alone with **3 lives**. Each death, you
+  respawn in place with a short window of invulnerability (the fish flashes
+  while it's safe) so the same hazard doesn't insta-kill again. The HUD shows
+  hearts, size tier, tempo multiplier, and the current shark/ray/anchor
+  counts. The result reports total survival time — ideal for testing the
+  difficulty curve.
 
 Uncheck **Include stingrays** on the setup screen for classic laser-sharks-only
 play. In the default mode: rays start after ~5 s (steady 4.5-7 s cadence, cap of

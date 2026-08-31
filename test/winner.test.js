@@ -40,6 +40,7 @@ test('party: all dead - longest survivor wins on deathT tiebreak', () => {
 
 test('solo: winner is the sole player when they die', () => {
   const s = newState('solo', 1);
+  s.players[0].lives = 1;   // skip the 3-life respawn dance for this test
   s.t = 7.5;
   Sim._kill(s, s.players[0], 'eaten', 0, 0);
   Sim._resolveWinner(s);

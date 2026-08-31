@@ -350,6 +350,11 @@ export const Render = {
     }
 
     ctx.save();
+    // Alive-but-invulnerable = post-respawn flash so the player can see the
+    // i-frames without confusing them for a full death.
+    if (p.alive && p.invuln > 0) {
+      alpha *= 0.35 + 0.55 * Math.abs(Math.sin(p.invuln * 22));
+    }
     ctx.globalAlpha = alpha;
     const wob = Math.sin(frame * 0.3 + p.id) * 3;
     ctx.save();
@@ -692,7 +697,17 @@ export const Render = {
     ctx.font = "bold 16px 'Segoe UI', sans-serif";
     label(`Time ${state.t.toFixed(1)}s`, 15, "left");
     if (state.mode === "solo") {
-      // Surface the difficulty knobs so the curve is observable.
+      // Solo shows a lives readout on the left (after time) and difficulty on the right.
+      const p = state.players[0];
+      if (p) {
+        const total = CFG.player.livesSolo;
+        const filled = Math.max(0, p.lives);
+        const hearts = "\u2665".repeat(filled) + "\u2661".repeat(Math.max(0, total - filled));
+        ctx.font = "bold 16px 'Segoe UI', sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillText(`Lives ${hearts}`, 130 + 1, 27);
+        ctx.fillStyle = "#ff8a9a"; ctx.fillText(`Lives ${hearts}`, 130, 26);
+      }
       const tier = Math.floor(state.t / CFG.shark.tierSeconds) + 1;
       const spd = Sim._speedMul(state.t).toFixed(2);
       const rayCount = (state.stingrays && state.stingrays.length) || 0;
@@ -700,6 +715,7 @@ export const Render = {
       const hazardBit = state.hazards === "sharks-only"
         ? `sharks ${state.sharks.length}`
         : `sharks ${state.sharks.length} \u2022 rays ${rayCount} \u2022 anchors ${anchorCount}`;
+      ctx.font = "bold 16px 'Segoe UI', sans-serif";
       label(`Size tier ${tier}   \u2022   tempo x${spd}   \u2022   ${hazardBit}`, W.w - 16, "right");
     } else {
       label(`Swimming: ${aliveCount}`, W.w - 16, "right");

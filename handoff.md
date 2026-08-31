@@ -43,7 +43,7 @@ Runs 22 tests via Node's built-in `node:test` (needs Node ≥ 20). Zero dependen
 
 **Modes:**
 - **Party:** first name in the list is the human (↑/↓ or W/S). Other names + practice bots are AI. Last one swimming wins.
-- **Solo survival:** you swim alone until death. HUD shows `Size tier`, `tempo xN`, and `sharks K • rays K` (or just `sharks K` in classic mode). Result is survival time. Use this to test the difficulty curve.
+- **Solo survival:** you swim alone with `CFG.player.livesSolo` lives (default 3). Each hit spends a life; on non-final hits the player respawns in place with `CFG.player.invulnDur` seconds of i-frames (rendered as an alpha flash). Final hit sets `alive=false` and the game ends. HUD shows `Lives ♥♥♥`, `Size tier`, `tempo xN`, and `sharks K • rays K • anchors K` (or just `sharks K` in classic mode). Result is total survival time.
 
 **Hazards toggle:** the setup checkbox `Include stingrays` maps to `config.hazards: "all" | "sharks-only"` on `Sim.createState`. Default `"all"` unlocks stingrays after `CFG.stingray.earliestT` seconds (4.5-7 s steady cadence, cap of `CFG.stingray.maxOnScreen`) and anchors after `CFG.anchor.earliestT` seconds (8-16 s cadence). `"sharks-only"` skips the ray + anchor spawn timers entirely, keeping the classic laser-sharks-only game.
 

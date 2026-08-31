@@ -13,6 +13,7 @@ function stateWithOneRay(overrides = {}) {
     players: [{ id: 0, name: 'A', isBot: false }]
   });
   s.spawnTimer = 1e6;   // no organic spawns
+  s.players[0].lives = 1;   // one-shot so a single strike resolves the assertion
   const scale = 1.3;
   s.stingrays = [{
     id: 1,
