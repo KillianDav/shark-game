@@ -8,7 +8,7 @@ A **standup picker game**: a team swims in an ocean, dodges laser-eyed sharks, a
 
 **End goal:** host it at a public URL so each person plays from their own browser, **in the same shared ocean at the same time**, live-synced. One room, one simulation, everyone sees the same sharks.
 
-**Current state:** a self-contained **local single-player** HTML build used to prove gameplay, art, and difficulty. The code is already split so multiplayer is a Transport swap, not a rewrite.
+**Current state:** local single-player build. As of the 2026-08-31 refactor the four layers (Sim/Render/Input/Transport) are extracted into ES modules under `src/`, a Node-based test suite covers Sim, and the sim is `import`-able from any Node script. Multiplayer is now a `WebSocketTransport` + `server/` addition, not a rewrite.
 
 Reference art / original shark sprite lives in the sibling project:
 
@@ -24,33 +24,51 @@ Reference art / original shark sprite lives in the sibling project:
 | Multiplayer model | **Shared real-time arena** (same ocean, same sharks). Not independent rounds. Not phone-as-controller. |
 | Finish line | **Removed.** Everyone swims at the same horizontal speed, so they hold a lane (`laneX`) and only dodge vertically. |
 | First build | Local HTML first, structured for a later server-authoritative websocket arena. |
-| Stack | Vanilla JS + Canvas. No build step. Offline `file://` must still work for the local build. |
+| Stack | Vanilla JS + Canvas + ES modules. No build step, no runtime dependencies. `npm test` uses Node's built-in test runner. Local play requires an HTTP server (`python -m http.server 8912`) - `file://` no longer works because browsers block ES module scripts on it. |
 
 ## How to run (today)
 
-- Open `index.html` in a browser (double-click or any static server).
+**Play:**
+```
+python -m http.server 8912 --bind 127.0.0.1   # or `npm run serve`
+# open http://127.0.0.1:8912/
+```
+Double-clicking `index.html` does NOT work — browsers block ES modules on `file://`.
+
+**Test:**
+```
+npm test
+```
+Runs 22 tests via Node's built-in `node:test` (needs Node ≥ 20). Zero dependencies. Tests live in `test/` and only `import` from `src/sim.js` — Render/Input/Transport are not tested (visual/browser-only).
+
+**Modes:**
 - **Party:** first name in the list is the human (↑/↓ or W/S). Other names + practice bots are AI. Last one swimming wins.
 - **Solo survival:** you swim alone until death. HUD shows `Size tier`, `tempo xN`, `sharks K`. Result is survival time. Use this to test the difficulty curve.
 
-A static server is optional. Last used: `python -m http.server 8912 --bind 127.0.0.1` from this folder → `http://127.0.0.1:8912/index.html`.
-
-Git is initialized locally. There is **no remote** and **no `package.json`** yet. Do not commit unless the user asks.
+**Git:** local repo has a `main` branch pushed to `github.com/KillianDav/shark-game`. Personal account, gmail-auth. Do not commit or push to work / EPR projects on this machine.
 
 ## Repo layout
 
-| File | Role |
+| Path | Role |
 |---|---|
-| `index.html` | **Latest playable build.** Entire game: CSS, setup UI, `Sim`, `Render`, `Input`, `LocalTransport`, main loop. |
-| `index-v1.html` | Snapshot: weaving sharks + fast difficulty ramp. No targeting. |
-| `index-v2.html` | Snapshot: targeting on entry + full vertical range (no safe corners). |
-| `README.md` | Player-facing + architecture overview. Slightly stale vs this file on polish details. |
+| `index.html` | Markup + CSS + `<script type="module" src="src/main.js">` + result overlay. Everything else is under `src/`. |
+| `src/sim.js` | Pure logic: `CFG`, `PLAYER_COLORS`, `makeRng`, `clamp`, `lerp`, `Sim`. No DOM, no canvas. Imported by client and tests (and by the eventual server). |
+| `src/render.js` | Canvas 2D drawing. Reads state snapshots, never mutates. Imports from `sim.js`. |
+| `src/input.js` | Keyboard → `{ up, down }` intent. Browser-only. |
+| `src/transport-local.js` | `LocalTransport()` — runs `Sim` in-tab. Same interface a future `WebSocketTransport` will implement. |
+| `src/main.js` | DOM wiring + fixed-timestep loop. Imports the four modules above. |
+| `test/` | `node:test` files: determinism (self-consistency + golden fixture), collision, winner, difficulty, bots, physics. |
+| `test/fixtures/golden-state.json` | Sim state snapshot captured from the pre-refactor code. Regenerate only when a *deliberate* gameplay change lands, and update the commit message to say what changed. |
+| `package.json` | `"type": "module"`, `npm test` / `npm run serve`. No dependencies. |
+| `history/index-v1.html`, `history/index-v2.html` | Older HTML snapshots kept for reference. Do not edit. |
+| `README.md` | Player-facing + architecture overview. |
 | `handoff.md` | This file. Agent-facing. Prefer this over README when continuing work. |
 
-`CFG` (all tunables) is near the top of the `<script>` in `index.html`.
+`CFG` (all tunables) is at the top of `src/sim.js`.
 
 ## Architecture (the multiplayer seam)
 
-Four layers inside one IIFE. Keep the boundary sacred.
+Four layers, one file each under `src/`. The boundary is enforced by `import` statements now — respect it.
 
 ```
 Input  →  Transport  →  Sim        (Sim advances the world)
@@ -97,10 +115,11 @@ Still being iterated. Do not treat as finished.
 
 ## Known pitfalls
 
-- Object shorthand cannot be `y - 4`. Use `y: y - 4`. A syntax error here silently breaks the whole IIFE (setup names stay empty, Start does nothing).
-- Background / unfocused tabs throttle `requestAnimationFrame`. Playtest in a focused window. “Skip to result” runs the sim synchronously and is good for catching JS errors.
-- `_seabed` is cached on `Render`. Reload the page after changing `_buildSeabed`.
-- `createState` uses `Date.now()` **only** as a default seed when none is passed. For multiplayer the **server must pick the seed** and send it in `config`.
+- Background / unfocused tabs throttle `requestAnimationFrame`. Playtest in a focused window. "Skip to result" runs the sim synchronously and is good for catching JS errors.
+- `Render._seabed` is cached on the module. If you change `_buildSeabed`, hard-reload the page.
+- `Sim.createState` uses `Date.now()` **only** as a default seed when none is passed. For multiplayer the **server must pick the seed** and send it in `config`.
+- **`state.rng` is a closure, not serialisable.** Deep-cloning or JSON-round-tripping the state loses it. Fine locally; when the server ships snapshots to clients, the server should send only the seed (or a resumable RNG state) and the client re-derives RNG from that. Not urgent — flag it before you first hand a Sim state across a wire.
+- Signed zero in numeric fields: `vy` can end up as `-0` when damping hits exactly zero, then JSON round-trips it to `+0`. The determinism test's `scrub()` normalises this — copy that helper if you write another Sim-comparing test.
 
 ## Phase 2 — online multiplayer (not built)
 
@@ -108,14 +127,15 @@ This is the next real feature. Goal: each player opens a hosted URL, types a nam
 
 ### Recommended build order
 
-1. **Extract `sim.js`** (UMD / dual export) containing `CFG` (or a shared subset), `makeRng`, `Sim`, `PLAYER_COLORS`. Load in the browser via `<script>` and in Node via `require`/`module.exports`. Do not put DOM or canvas in this file.
-2. **`server.js`** — Node + [`ws`](https://github.com/websockets/ws):
+1. ~~Extract `sim.js`.~~ **Done** (2026-08-31). `src/sim.js` is already the shared module — `import` it verbatim in Node.
+2. **`server/index.js`** — Node + [`ws`](https://github.com/websockets/ws), ESM (`import { Sim, CFG } from '../src/sim.js'`):
    - Rooms: host creates a room (short code) → others join by URL/`?room=XXXX` + name.
-   - Lobby → countdown → `Sim.createState({ players, seed, mode: "party" })` on the server.
+   - Lobby → countdown → `Sim.createState({ players, seed, mode: "party" })` on the server. **Server picks the seed** (see pitfalls).
    - Fixed tick (`CFG.fixedDt`). Collect latest `{ up, down }` per `playerId`. `Sim.step`. Broadcast snapshot (or a slim snapshot) to all clients.
    - When `state.status === "over"`, broadcast winner and freeze.
-3. **`WebSocketTransport`** — same interface as `LocalTransport`. `sendInput` sends intent to the server. Incoming snapshots become `snapshot()`. Main loop and Render stay as-is. **Server-authoritative, no prediction at first.** Add interpolation only if lag is obvious.
-4. **Client lobby UI** — replace/extend the setup screen: name, room code, player list, “ready”, host Start. Keep Party win copy (“they run the next standup”). Solo mode can stay local-only.
+   - Sanitise the snapshot before sending: strip `state.rng`, prefer sending `state.seed` and let the client rebuild rng if it needs to.
+3. **`src/transport-websocket.js`** — same interface as `LocalTransport` (`start` / `sendInput` / `tick` / `snapshot` / `isOver`). `sendInput` sends intent to the server. Incoming snapshots become `snapshot()`. Main loop and Render stay as-is. **Server-authoritative, no prediction at first.** Add interpolation only if lag is obvious.
+4. **Client lobby UI** — replace/extend the setup screen: name, room code, player list, "ready", host Start. Keep Party win copy ("they run the next standup"). Solo mode can stay local-only.
 5. **Deploy** — static files + a websocket-capable host (Fly.io, Render, small VM). Client needs a configurable server URL (query param or a small `config.js`).
 
 ### Suggested wire protocol (starting point)
@@ -141,27 +161,29 @@ Do **not** let clients spawn sharks or decide deaths.
 
 Render-only things (seabed props, bubbles, mouth draw, vapor sparks) can stay client-only **if** they are derived from snapshot fields (`t`, `frame`, `chomp`, `deathKind`, `deathT`). Seabed uses a fixed seed today — keep it that way so every client draws the same floor without sending prop lists.
 
+If you change `Sim` behaviour, `test/fixtures/golden-state.json` will fail. That's the point — regenerate it only when the change is intentional, and note the reason in the commit message. See `test/determinism.test.js` for the exact config that produces the fixture.
+
 ## Suggested next work (priority)
 
-1. User-facing art check: bite mouth, starfish-on-sand, single chest. Iterate only if they still dislike it.
-2. Then **Phase 2 multiplayer** as above. Do not add a finish line, homing sharks, or a second game mode unless asked.
-3. Optional later: `localStorage` best time for Solo; interpolate remote snapshots; host-kicks / reconnect.
+1. **Phase 2 multiplayer** (`server/` + `WebSocketTransport`) as above. Do not add a finish line, homing sharks, or a second game mode unless asked.
+2. Optional later: `localStorage` best time for Solo; interpolate remote snapshots; host-kicks / reconnect.
+3. Optional tooling: add ESLint/Prettier or a bundler only when the codebase feels too big to keep in your head. Not before.
 
 ## Agent conventions for this user
 
-- Prefer small, targeted edits. Match existing style (vanilla IIFE, `CFG` knobs, no framework).
-- Save a snapshot (`index-vN.html`) before large gameplay changes if the user asks to “save a copy”.
+- Prefer small, targeted edits. Match existing style (ES modules, `CFG` knobs, no framework).
+- `npm test` before committing any change to `src/sim.js`. If a test fails, verify whether the change is intentional (update the test / regenerate the golden fixture) or a regression (fix the sim).
+- Save a snapshot in `history/` before large gameplay changes only if the user asks to "save a copy". Git history covers most cases.
 - Verify UI in a browser when possible. A single screenshot is not enough for gameplay — click through setup → start → result.
-- Do not commit or push unless explicitly asked.
+- Do not commit or push unless explicitly asked. Pushes go to `github.com/KillianDav/shark-game` (personal, gmail-auth). Never push to work / EPR projects.
 - Do not edit the plan file from the original Cursor plan session.
 
-## Quick map of the script in `index.html`
+## Quick map (where to find things)
 
-Search these identifiers:
-
-- `CFG` — tunables
-- `Sim` — `createState`, `step`, `_spawnShark`, `_botIntent`, `_resolveWinner`
-- `Render` — `drawSharkSprite`, `drawSharkLaser`, `drawPlayer`, `drawSeabed`, `drawState`
-- `Input` — key map
-- `LocalTransport` — in-tab sim
-- `startGame` / `loop` / `endGame` — glue + Party vs Solo result copy
+- **Tunables** — `CFG` at the top of `src/sim.js`.
+- **Sim** — `src/sim.js`: `createState`, `step`, `_spawnShark`, `_botIntent`, `_resolveWinner`, `_difficulty`, `_speedMul`, `_spawnInterval`, `_eye`, `_kill`.
+- **Render** — `src/render.js`: `drawSharkSprite`, `drawSharkLaser`, `drawWindupCharge`, `drawPlayer`, `_waterColorAt`, `_buildSeabed`, `drawSeabed`, `drawState`.
+- **Input** — `src/input.js`: key map, `attach` / `detach` / `intent` / `reset`.
+- **LocalTransport** — `src/transport-local.js`: in-tab sim.
+- **Glue** — `src/main.js`: `startGame` / `loop` / `endGame` + setup UI + Party vs Solo result copy.
+- **Tests** — `test/*.test.js`. Fixtures in `test/fixtures/`.
