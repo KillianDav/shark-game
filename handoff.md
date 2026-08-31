@@ -8,7 +8,7 @@ A **standup picker game**: a team swims in an ocean, dodges laser-eyed sharks, a
 
 **End goal:** host it at a public URL so each person plays from their own browser, **in the same shared ocean at the same time**, live-synced. One room, one simulation, everyone sees the same sharks.
 
-**Current state:** local single-player build. As of the 2026-08-31 refactor the four layers (Sim/Render/Input/Transport) are extracted into ES modules under `src/`, a Node-based test suite covers Sim, and the sim is `import`-able from any Node script. Multiplayer is now a `WebSocketTransport` + `server/` addition, not a rewrite.
+**Current state:** local single-player build. As of the 2026-08-31 refactor the four layers (Sim/Render/Input/Transport) are extracted into ES modules under `src/`, a Node-based test suite covers Sim, and the sim is `import`-able from any Node script. The 2026-08-31 stingray feature adds a low-frequency seabed hazard (tail-whipping stingrays) alongside the sharks, with a `hazards: "sharks-only"` mode preserving the classic laser-sharks-only play. Multiplayer is a `WebSocketTransport` + `server/` addition, not a rewrite.
 
 Reference art / original shark sprite lives in the sibling project:
 
@@ -43,7 +43,9 @@ Runs 22 tests via Node's built-in `node:test` (needs Node ≥ 20). Zero dependen
 
 **Modes:**
 - **Party:** first name in the list is the human (↑/↓ or W/S). Other names + practice bots are AI. Last one swimming wins.
-- **Solo survival:** you swim alone until death. HUD shows `Size tier`, `tempo xN`, `sharks K`. Result is survival time. Use this to test the difficulty curve.
+- **Solo survival:** you swim alone until death. HUD shows `Size tier`, `tempo xN`, and `sharks K • rays K` (or just `sharks K` in classic mode). Result is survival time. Use this to test the difficulty curve.
+
+**Hazards toggle:** the setup checkbox `Include stingrays` maps to `config.hazards: "all" | "sharks-only"` on `Sim.createState`. Default `"all"` adds stingrays after `CFG.stingray.earliestT` seconds; `"sharks-only"` keeps the classic laser-sharks-only game (bit-identical rng consumption to the pre-stingray sim).
 
 **Git:** local repo has a `main` branch pushed to `github.com/KillianDav/shark-game`. Personal account, gmail-auth. Do not commit or push to work / EPR projects on this machine.
 
@@ -75,7 +77,7 @@ Input  →  Transport  →  Sim        (Sim advances the world)
 Render ←  Transport  ←  Sim        (Render draws a snapshot only)
 ```
 
-- **Sim** — pure. `Sim.createState(config)` and `Sim.step(state, humanInputs, dt)`. No DOM, no canvas, no `Date.now()` inside `step`. RNG is seeded `mulberry32` (`makeRng(seed)`). Same seed + same inputs = same game on any JS engine.
+- **Sim** — pure. `Sim.createState(config)` and `Sim.step(state, humanInputs, dt)`. No DOM, no canvas, no `Date.now()` inside `step`. RNG is seeded `mulberry32` (`makeRng(seed)`). Same seed + same inputs = same game on any JS engine. State carries two hazard collections: `state.sharks` and `state.stingrays`.
 - **Render** — reads a snapshot, never mutates sim state. Draws ocean, seabed props, sharks, lasers, players, HUD, result overlay (result overlay is DOM, not canvas).
 - **Input** — arrow keys / W S → `{ up, down }`.
 - **Transport** — **the only thing that changes for online play.** Interface:
@@ -181,8 +183,8 @@ If you change `Sim` behaviour, `test/fixtures/golden-state.json` will fail. That
 ## Quick map (where to find things)
 
 - **Tunables** — `CFG` at the top of `src/sim.js`.
-- **Sim** — `src/sim.js`: `createState`, `step`, `_spawnShark`, `_botIntent`, `_resolveWinner`, `_difficulty`, `_speedMul`, `_spawnInterval`, `_eye`, `_kill`.
-- **Render** — `src/render.js`: `drawSharkSprite`, `drawSharkLaser`, `drawWindupCharge`, `drawPlayer`, `_waterColorAt`, `_buildSeabed`, `drawSeabed`, `drawState`.
+- **Sim** — `src/sim.js`: `createState`, `step`, `_spawnShark`, `_spawnStingray`, `_stingTip`, `_botIntent`, `_resolveWinner`, `_difficulty`, `_speedMul`, `_spawnInterval`, `_eye`, `_kill`.
+- **Render** — `src/render.js`: `drawSharkSprite`, `drawSharkLaser`, `drawWindupCharge`, `drawStingray`, `drawPlayer`, `_waterColorAt`, `_buildSeabed`, `drawSeabed`, `drawState`.
 - **Input** — `src/input.js`: key map, `attach` / `detach` / `intent` / `reset`.
 - **LocalTransport** — `src/transport-local.js`: in-tab sim.
 - **Glue** — `src/main.js`: `startGame` / `loop` / `endGame` + setup UI + Party vs Solo result copy.

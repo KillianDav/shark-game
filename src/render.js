@@ -141,9 +141,106 @@ export const Render = {
     ctx.shadowBlur = 0;
   },
 
+  drawStingray(ctx, r, frame) {
+    const S = CFG.stingray;
+    const s = r.scale;
+    const T = r.sting;
+    const wingWave = Math.sin(frame * 0.18 + r.id) * 3;
+
+    ctx.save();
+    ctx.translate(r.x, r.y);
+
+    // Soft shadow on the sand right below the ray.
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.beginPath(); ctx.ellipse(0, 22, S.bodyRX * s * 0.9, 3.2, 0, 0, 7); ctx.fill();
+
+    // Body - a flat kite. Two ellipses give the diamond silhouette.
+    ctx.fillStyle = "#453b30";
+    ctx.beginPath(); ctx.ellipse(0, 0, S.bodyRX * s, (S.bodyRY + 1) * s + wingWave * 0.3, 0, 0, 7); ctx.fill();
+    // Front point (nose) - a small triangle poking forward
+    ctx.beginPath();
+    ctx.moveTo(-S.bodyRX * s, 0);
+    ctx.lineTo(-S.bodyRX * s - 8 * s, -2);
+    ctx.lineTo(-S.bodyRX * s - 8 * s, 2);
+    ctx.closePath(); ctx.fill();
+    // Highlight along the back so the body reads as 3D-ish
+    ctx.fillStyle = "#5f5344";
+    ctx.beginPath(); ctx.ellipse(-2, -1.5, (S.bodyRX - 6) * s, (S.bodyRY - 1) * s * 0.9, 0, 0, 7); ctx.fill();
+    // Sand-toned spots for cartoon flair
+    ctx.fillStyle = "#786550";
+    ctx.beginPath(); ctx.arc(-6 * s, -1, 1.6 * s, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(4 * s, 1, 1.4 * s, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(12 * s, -1, 1.2 * s, 0, 7); ctx.fill();
+
+    // Undulating wing edges - two small curves that flap as the ray glides
+    ctx.strokeStyle = "#332b23"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-S.bodyRX * s * 0.4, -S.bodyRY * s - 1);
+    ctx.quadraticCurveTo(0, -S.bodyRY * s - 2 - wingWave * 0.4, S.bodyRX * s * 0.4, -S.bodyRY * s - 1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-S.bodyRX * s * 0.4, S.bodyRY * s + 1);
+    ctx.quadraticCurveTo(0, S.bodyRY * s + 2 + wingWave * 0.4, S.bodyRX * s * 0.4, S.bodyRY * s + 1);
+    ctx.stroke();
+
+    // Eyes on top of the body, near the front (leftward-facing).
+    ctx.fillStyle = "#0d141a";
+    ctx.beginPath(); ctx.arc(-S.bodyRX * s * 0.55, -1.8, 1.2 * s, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(-S.bodyRX * s * 0.55, 1.8, 1.2 * s, 0, 7); ctx.fill();
+
+    // Tail - either trailing behind (idle) or arced up to the strike tip.
+    const tailBaseX = S.bodyRX * s - 2;
+    const tailBaseY = 2;
+    let tipX, tipY, curveX, curveY;
+    if (T.state === "windup" || T.state === "active") {
+      tipX = T.x - r.x; tipY = T.y - r.y;
+      curveX = (tailBaseX + tipX) / 2;
+      curveY = Math.min(tailBaseY, tipY) - 14;
+      ctx.strokeStyle = T.state === "active" ? "#c7a640" : "#3a342c";
+      ctx.lineWidth = T.state === "active" ? 2.8 : 2.4;
+    } else {
+      tipX = tailBaseX + S.tailIdleLen * s * 0.8;
+      tipY = tailBaseY + Math.sin(frame * 0.08 + r.id) * 3;
+      curveX = (tailBaseX + tipX) / 2;
+      curveY = (tailBaseY + tipY) / 2 + Math.sin(frame * 0.06 + r.id) * 2;
+      ctx.strokeStyle = "#3a342c";
+      ctx.lineWidth = 2.1;
+    }
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(tailBaseX, tailBaseY);
+    ctx.quadraticCurveTo(curveX, curveY, tipX, tipY);
+    ctx.stroke();
+
+    // Barb at the tail tip - a small triangle. Glows during an active strike.
+    ctx.save();
+    if (T.state === "active") { ctx.shadowColor = "#ffd240"; ctx.shadowBlur = 14; }
+    ctx.fillStyle = T.state === "active" ? "#ffe066" : "#e6dfcc";
+    // Aim the barb roughly along the tail direction so it looks pointy, not blobby.
+    const ang = Math.atan2(tipY - curveY, tipX - curveX);
+    ctx.translate(tipX, tipY); ctx.rotate(ang);
+    ctx.beginPath();
+    ctx.moveTo(4, 0); ctx.lineTo(-3, -2); ctx.lineTo(-3, 2); ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // Extra active-strike telegraph: bright halo pulsing at the tip.
+    if (T.state === "active") {
+      const pulse = 1 + Math.abs(Math.sin(frame * 0.5));
+      ctx.fillStyle = "rgba(255,240,120,0.35)";
+      ctx.beginPath(); ctx.arc(tipX, tipY, 7 * pulse, 0, 7); ctx.fill();
+    } else if (T.state === "windup") {
+      // Softer glow so the player can see it coming without feeling cheated.
+      ctx.fillStyle = "rgba(255,200,80,0.22)";
+      ctx.beginPath(); ctx.arc(tipX, tipY, 5, 0, 7); ctx.fill();
+    }
+
+    ctx.restore();
+  },
+
   drawPlayer(ctx, p, state) {
     const frame = state.frame;
-    let alpha = 1, scale = 1, showBody = true, showName = true, vaporSparks = false;
+    let alpha = 1, scale = 1, showBody = true, showName = true, vaporSparks = false, stungSparks = false;
 
     if (!p.alive) {
       const age = state.t - (p.deathT || 0);
@@ -155,6 +252,16 @@ export const Render = {
         alpha = (0.55 + 0.45 * Math.sin(age * 34)) * (1 - t);  // flicker, fading out
         scale = 1 - t * 0.6;
         vaporSparks = true;
+        showName = false;
+      } else if (p.deathKind === "stung") {
+        // Stung: quick electric flicker then shrink. Distinct from "eaten" so
+        // the player can tell what killed them.
+        const dur = CFG.fx.stingDur;
+        if (age >= dur) return;
+        const t = age / dur;
+        alpha = (0.5 + 0.5 * Math.sin(age * 55)) * (1 - t);
+        scale = 1 - t * 0.7;
+        stungSparks = true;
         showName = false;
       } else {
         // Eaten: quick shrink into the shark's jaws.
@@ -181,6 +288,15 @@ export const Render = {
         const a = (i / 6) * Math.PI * 2 + frame * 0.2;
         const r = 14 + (frame % 12);
         ctx.fillRect(Math.cos(a) * r, Math.sin(a) * r - (frame % 20), 2, 2);
+      }
+    }
+    if (stungSparks) {
+      // Yellow electric jitter - distinct from the blue laser vapor.
+      ctx.fillStyle = "rgba(255,232,120,0.85)";
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + frame * 0.4;
+        const r = 12 + (i % 3) * 3;
+        ctx.fillRect(Math.cos(a) * r, Math.sin(a) * r, 2, 2);
       }
     }
 
@@ -454,6 +570,11 @@ export const Render = {
       ctx.beginPath(); ctx.arc(W.w - bx, by, 2 + (i % 3), 0, 7); ctx.fill();
     }
 
+    // --- stingrays (drawn behind sharks so sharks stay visually dominant) ---
+    if (state.stingrays) {
+      for (const r of state.stingrays) Render.drawStingray(ctx, r, state.frame);
+    }
+
     // --- sharks + lasers ---
     for (const sh of state.sharks) {
       const charging = sh.laser.state === "windup";
@@ -492,7 +613,11 @@ export const Render = {
       // Surface the difficulty knobs so the curve is observable.
       const tier = Math.floor(state.t / CFG.shark.tierSeconds) + 1;
       const spd = Sim._speedMul(state.t).toFixed(2);
-      label(`Size tier ${tier}   \u2022   tempo x${spd}   \u2022   sharks ${state.sharks.length}`, W.w - 16, "right");
+      const rayCount = (state.stingrays && state.stingrays.length) || 0;
+      const hazardBit = state.hazards === "sharks-only"
+        ? `sharks ${state.sharks.length}`
+        : `sharks ${state.sharks.length} \u2022 rays ${rayCount}`;
+      label(`Size tier ${tier}   \u2022   tempo x${spd}   \u2022   ${hazardBit}`, W.w - 16, "right");
     } else {
       label(`Swimming: ${aliveCount}`, W.w - 16, "right");
     }

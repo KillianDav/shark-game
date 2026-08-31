@@ -51,10 +51,29 @@ export const CFG = {
     laserRange: 1000, laserBand: 4,   // half the visible beam thickness (kill only on visual touch)
     chomp: 0.42                  // seconds a shark holds its jaws open after a bite
   },
+  stingray: {
+    // Occasional low-frequency hazard that glides along the seabed and stings
+    // with a telegraphed tail whip. A stingray spawn *replaces* a shark spawn -
+    // total pace stays the same; a fraction of spawns become rays instead.
+    spawnChance: 0.28,            // fraction of eligible spawn slots that become a ray
+    earliestT: 5,                 // no rays until this many seconds in (early game is pure sharks)
+    minSpeed: 55, maxSpeed: 95,   // markedly slower than sharks
+    minY: 588, maxY: 660,         // hug the sand
+    scaleMin: 1.2, scaleMax: 1.55,
+    bodyRX: 34, bodyRY: 6,        // flat body (cosmetic; the body itself does not kill)
+    tailIdleLen: 60,              // length of the trailing tail when not striking
+    waveAmpMin: 5, waveAmpMax: 12,        // gentle bob along the sand
+    waveFreqMin: 0.4, waveFreqMax: 0.85,
+    stingCooldownMin: 1.6, stingCooldownMax: 3.2,
+    stingWindup: 0.35,            // tail rears back - telegraph, harmless
+    stingActive: 0.22,            // tail whip lands - lethal
+    stingReach: 32,               // radius of the strike hitbox at the tail tip
+    strikeUp: 44, strikeAhead: 18 // tail-tip offset relative to body during strike (up + slightly forward)
+  },
   // Gentle, shared speed-up applied to BOTH shark travel speed and player
   // vertical agility, so the tempo rises but dodging stays just as feasible.
   progression: { speedPerSec: 0.02, speedMax: 2.6 },
-  fx: { vaporDur: 0.8, eatDur: 0.3 },  // laser vaporise + eaten shrink durations
+  fx: { vaporDur: 0.8, eatDur: 0.3, stingDur: 0.45 },  // laser vaporise, eaten shrink, stung electric-shrink
   fixedDt: 1 / 60
 };
 
@@ -98,13 +117,16 @@ export const Sim = {
 
     return {
       seed, rng,
-      mode: config.mode || "party",   // "party" | "solo"
+      mode: config.mode || "party",       // "party" | "solo"
+      hazards: config.hazards || "all",   // "all" (sharks + stingrays) | "sharks-only" (classic)
       decor,
       t: 0, frame: 0,
       status: "playing",          // "playing" | "over"
       players,
       sharks: [],
+      stingrays: [],
       nextSharkId: 1,
+      nextStingrayId: 1,
       spawnTimer: 0.8,
       winnerId: null
     };
@@ -174,6 +196,39 @@ export const Sim = {
   // Eye position of a leftward-swimming shark (front of the head).
   _eye(sh) { const s = sh.scale || 1.7; return { x: sh.x - 16 * s, y: sh.y - 4 * s }; },
 
+  _spawnStingray(state) {
+    const R = CFG.stingray, rng = state.rng, W = CFG.world;
+    const speed = lerp(R.minSpeed, R.maxSpeed, rng()) * Sim._speedMul(state.t);
+    const startX = W.w + 60;
+    const swimT = rng() * 10;
+    const waveAmp = lerp(R.waveAmpMin, R.waveAmpMax, rng());
+    const waveFreq = lerp(R.waveFreqMin, R.waveFreqMax, rng());
+    const wavePhase = rng() * Math.PI * 2;
+    const scale = lerp(R.scaleMin, R.scaleMax, rng());
+    const baseY = lerp(R.minY, R.maxY, rng());
+    state.stingrays.push({
+      id: state.nextStingrayId++,
+      x: startX,
+      y: clamp(baseY + Math.sin(swimT * waveFreq + wavePhase) * waveAmp, R.minY, R.maxY),
+      baseY, swimT, waveAmp, waveFreq, wavePhase,
+      vx: -speed,
+      scale,
+      // Strike state machine + last strike position (used by both collision and Render).
+      sting: {
+        state: "idle",
+        timer: R.stingCooldownMin + rng() * (R.stingCooldownMax - R.stingCooldownMin),
+        x: 0, y: 0
+      }
+    });
+  },
+
+  // Point at the tail tip during a strike - used by both the collision test and
+  // the renderer, so they can't drift out of sync.
+  _stingTip(r) {
+    const R = CFG.stingray;
+    return { x: r.x + R.strikeAhead * r.scale, y: r.y - R.strikeUp * r.scale };
+  },
+
   // Compute a bot's {up, down} intent from the current world state.
   _botIntent(state, p) {
     const s = CFG.shark;
@@ -191,6 +246,17 @@ export const Sim = {
         }
       }
     }
+    // Stingrays: a windup or active tail-strike is a real threat at the tip
+    // position; the ray body itself doesn't hurt but we still steer away from
+    // its Y so we don't drift into an incoming strike.
+    for (const r of state.stingrays) {
+      const dx = r.x - p.x;
+      if (dx < -40 || dx > detect) continue;
+      if (r.sting.state === "windup" || r.sting.state === "active") {
+        const tip = Sim._stingTip(r);
+        if (Math.abs(tip.x - p.x) < best) { best = Math.abs(tip.x - p.x); threatY = tip.y; }
+      } else if (dx < best) { best = dx; threatY = r.y; }
+    }
     if (threatY == null) {
       // drift gently toward vertical centre
       const mid = (CFG.world.waterTop + CFG.world.waterBottom) / 2;
@@ -205,15 +271,17 @@ export const Sim = {
 
   step(state, humanInputs, dt) {
     if (state.status === "over") return state;
-    const W = CFG.world, P = CFG.player, S = CFG.shark;
+    const W = CFG.world, P = CFG.player, S = CFG.shark, R = CFG.stingray;
     state.t += dt;
     state.frame++;
     const m = Sim._speedMul(state.t);   // shared tempo: players get faster with the sharks
 
-    // --- spawn sharks ---
+    // --- spawn hazards (a fraction of spawns are stingrays instead of sharks) ---
     state.spawnTimer -= dt;
     if (state.spawnTimer <= 0) {
-      Sim._spawnShark(state);
+      const raysAllowed = state.hazards !== "sharks-only" && state.t >= R.earliestT;
+      if (raysAllowed && state.rng() < R.spawnChance) Sim._spawnStingray(state);
+      else Sim._spawnShark(state);
       state.spawnTimer += Sim._spawnInterval(state.t);
     }
 
@@ -242,6 +310,28 @@ export const Sim = {
     // cull off-screen sharks
     state.sharks = state.sharks.filter((sh) => sh.x > -80);
 
+    // --- move stingrays + drive their tail-strike state machine ---
+    for (const r of state.stingrays) {
+      r.x += r.vx * dt;
+      r.swimT += dt;
+      r.y = clamp(r.baseY + Math.sin(r.swimT * r.waveFreq + r.wavePhase) * r.waveAmp, R.minY, R.maxY);
+      const T = r.sting;
+      T.timer -= dt;
+      if (T.state === "idle") {
+        // Only strike while on-screen so an off-screen ray isn't wasting swings.
+        if (T.timer <= 0 && r.x > 60 && r.x < W.w - 40) {
+          T.state = "windup"; T.timer = R.stingWindup;
+        }
+      } else if (T.state === "windup") {
+        if (T.timer <= 0) { T.state = "active"; T.timer = R.stingActive; }
+      } else if (T.state === "active") {
+        if (T.timer <= 0) { T.state = "idle"; T.timer = R.stingCooldownMin + state.rng() * (R.stingCooldownMax - R.stingCooldownMin); }
+      }
+      // Snapshot the strike position each tick so Sim + Render agree on where it is.
+      if (T.state !== "idle") { const tip = Sim._stingTip(r); T.x = tip.x; T.y = tip.y; }
+    }
+    state.stingrays = state.stingrays.filter((r) => r.x > -80);
+
     // --- move players (vertical dodging only; they hold their lane) ---
     for (const p of state.players) {
       if (!p.alive) continue;
@@ -255,6 +345,19 @@ export const Sim = {
       p.y += p.vy * dt;
       if (p.y < W.waterTop + P.ry) { p.y = W.waterTop + P.ry; p.vy = 0; }
       if (p.y > W.waterBottom - P.ry) { p.y = W.waterBottom - P.ry; p.vy = 0; }
+    }
+
+    // --- stingray tail-strike (only during the active phase) ---
+    for (const r of state.stingrays) {
+      if (r.sting.state !== "active") continue;
+      const tip = r.sting;
+      const reach = R.stingReach + P.rx;
+      const reachSq = reach * reach;
+      for (const p of state.players) {
+        if (!p.alive) continue;
+        const dx = p.x - tip.x, dy = p.y - tip.y;
+        if (dx * dx + dy * dy <= reachSq) Sim._kill(state, p, "stung", tip.x, tip.y);
+      }
     }
 
     // --- collisions (eat + laser) ---

@@ -1,9 +1,11 @@
 # Standup Shark
 
 A stand-up picker game. Swim left to right, dodge the laser-eyed sharks coming
-the other way, and the **winner runs the next standup**. Sharks try to eat you
-on contact or fry you with an eye-laser. Control your swimmer with the
-**up / down arrow keys** (W / S also work).
+the other way (and the tail-whipping stingrays patrolling the seabed), and the
+**winner runs the next standup**. Sharks try to eat you on contact or fry you
+with an eye-laser; stingrays glide along the sand and jab upward with a
+telegraphed tail sting. Control your swimmer with the **up / down arrow keys**
+(W / S also work).
 
 The shark art (and the laser-eye rendering) is ported from the reference
 `standup-lemmings/index-shark.html` game.
@@ -25,8 +27,12 @@ Pick a mode on the setup screen:
   and every other name becomes an AI bot swimmer. "Practice bots" adds extra AI
   swimmers. The last one still swimming wins and runs the next standup.
 - **Solo survival** — you swim alone until you die. The HUD shows the live
-  difficulty (size tier, tempo multiplier, shark count) and the result reports
-  how long you lasted — ideal for testing the difficulty curve.
+  difficulty (size tier, tempo multiplier, shark + ray counts) and the result
+  reports how long you lasted — ideal for testing the difficulty curve.
+
+Uncheck **Include stingrays** on the setup screen for classic laser-sharks-only
+play. Stingrays default on; they start spawning after ~5 seconds and replace
+about a quarter of shark spawns from then on.
 
 ## Test it
 
@@ -37,8 +43,9 @@ npm test
 ```
 
 The suite covers determinism (same seed + inputs → same state, plus a golden
-fixture captured from the pre-refactor code), collision, winner resolution,
-difficulty curve, bot dodge, and player physics.
+fixture pinning current gameplay), shark collision, stingray tail-strike +
+sharks-only mode, winner resolution, difficulty curve, bot dodge, and player
+physics.
 
 ## Repo layout
 

@@ -24,6 +24,7 @@ const DEFAULT_NAMES = ["Ahmed", "Ben", "Chris", "Dana", "Eve"];
 const els = {
   names: document.getElementById("names"),
   botCount: document.getElementById("botCount"),
+  stingraysToggle: document.getElementById("stingraysToggle"),
   startBtn: document.getElementById("startBtn"),
   resetNamesBtn: document.getElementById("resetNamesBtn"),
   setup: document.getElementById("setup"),
@@ -88,7 +89,8 @@ function startGame() {
   const names = parseNames();
   const botCount = clamp(parseInt(els.botCount.value, 10) || 0, 0, 10);
   const players = buildPlayers(names, botCount, mode);
-  const config = { players, mode, seed: (Date.now() & 0xffffffff) };
+  const hazards = els.stingraysToggle && els.stingraysToggle.checked ? "all" : "sharks-only";
+  const config = { players, mode, hazards, seed: (Date.now() & 0xffffffff) };
   game.lastConfig = { names, botCount };
 
   game.transport = LocalTransport();
@@ -146,7 +148,9 @@ function endGame(state) {
     const survived = (winner && winner.deathT != null ? winner.deathT : state.t);
     const tier = Math.floor(survived / CFG.shark.tierSeconds) + 1;
     const spd = Sim._speedMul(survived).toFixed(2);
-    const how = winner && winner.deathKind === "laser" ? "lasered" : "eaten";
+    const how = winner && winner.deathKind === "laser" ? "lasered"
+              : winner && winner.deathKind === "stung" ? "stung by a ray"
+              : "eaten";
     els.resultLead.textContent = "You survived";
     els.swatch.style.display = "none";
     els.winnerName.textContent = `${survived.toFixed(1)}s`;
