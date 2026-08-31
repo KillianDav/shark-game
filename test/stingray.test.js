@@ -42,7 +42,8 @@ test('tail-strike does NOT kill outside stingReach', () => {
   const r = s.stingrays[0];
   const tip = Sim._stingTip(r);
   r.sting = { state: 'active', timer: 0.1, x: tip.x, y: tip.y };
-  s.players[0].x = tip.x + CFG.stingray.stingReach + CFG.player.rx + 20;
+  // Well outside: player body radius + sting reach + generous margin
+  s.players[0].x = tip.x + CFG.stingray.stingReach + CFG.player.rx + 40;
   s.players[0].y = tip.y;
   s.players[0].vy = 0;
   Sim.step(s, { 0: { up: 0, down: 0 } }, 1 / 60);
@@ -63,19 +64,23 @@ test('ray body is safe to touch while sting is idle or winding up', () => {
   }
 });
 
-test('sharks-only mode never spawns stingrays', () => {
+test('sharks-only mode never spawns stingrays or anchors', () => {
   const s = Sim.createState({
     seed: 1,
-    mode: 'solo',
+    mode: 'party',
     hazards: 'sharks-only',
-    players: [{ id: 0, name: 'A', isBot: true }]   // bot so it survives longer for spawns
+    // pack of bots so someone survives long enough to test the ray/anchor windows
+    players: Array.from({ length: 6 }, (_, i) => ({ id: i, name: 'B' + i, isBot: true }))
   });
-  // run 60 seconds — well past earliestT, plenty of spawn opportunities
-  for (let i = 0; i < 3600; i++) {
+  let peakRays = 0, peakAnchors = 0;
+  for (let i = 0; i < 4500; i++) {
     Sim.step(s, {}, 1 / 60);
+    peakRays = Math.max(peakRays, s.stingrays.length);
+    peakAnchors = Math.max(peakAnchors, s.anchors.length);
     if (s.status === 'over') break;
   }
-  assert.equal(s.stingrays.length, 0, 'no rays should have spawned in sharks-only mode');
+  assert.equal(peakRays, 0, 'no rays should ever spawn in sharks-only mode');
+  assert.equal(peakAnchors, 0, 'no anchors should ever spawn in sharks-only mode');
   assert.ok(s.sharks.length > 0 || s.status === 'over', 'sharks should still spawn');
 });
 

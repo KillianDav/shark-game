@@ -150,6 +150,7 @@ function endGame(state) {
     const spd = Sim._speedMul(survived).toFixed(2);
     const how = winner && winner.deathKind === "laser" ? "lasered"
               : winner && winner.deathKind === "stung" ? "stung by a ray"
+              : winner && winner.deathKind === "anchor" ? "anchored"
               : "eaten";
     els.resultLead.textContent = "You survived";
     els.swatch.style.display = "none";

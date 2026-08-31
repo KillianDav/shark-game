@@ -1,11 +1,12 @@
 # Standup Shark
 
-A stand-up picker game. Swim left to right, dodge the laser-eyed sharks coming
-the other way (and the tail-whipping stingrays patrolling the seabed), and the
-**winner runs the next standup**. Sharks try to eat you on contact or fry you
-with an eye-laser; stingrays glide along the sand and jab upward with a
-telegraphed tail sting. Control your swimmer with the **up / down arrow keys**
-(W / S also work).
+A stand-up picker game. Dodge the laser-eyed sharks coming the other way,
+the tail-whipping stingrays patrolling the lower water, and the occasional
+anchor plunging down from above — the **winner runs the next standup**.
+Sharks eat on contact or fry you with an eye-laser; stingrays glide slowly
+with a wavy motion and telegraph a wide tail-sting circle (the visible glow
+IS the kill zone); anchors drop straight down and only kill on a direct body
+hit. Control your swimmer with the **up / down arrow keys** (W / S also work).
 
 The shark art (and the laser-eye rendering) is ported from the reference
 `standup-lemmings/index-shark.html` game.
@@ -31,8 +32,9 @@ Pick a mode on the setup screen:
   reports how long you lasted — ideal for testing the difficulty curve.
 
 Uncheck **Include stingrays** on the setup screen for classic laser-sharks-only
-play. Stingrays default on; they start spawning after ~5 seconds and replace
-about a quarter of shark spawns from then on.
+play. In the default mode: rays start after ~5 s (steady 4.5-7 s cadence, cap of
+2 on screen), anchors start after ~12 s (8-16 s cadence). Sharks-only mode
+disables both — the classic laser-sharks-only game.
 
 ## Test it
 

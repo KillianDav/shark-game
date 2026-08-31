@@ -224,23 +224,90 @@ export const Render = {
     ctx.fill();
     ctx.restore();
 
-    // Extra active-strike telegraph: bright halo pulsing at the tip.
+    // Danger telegraph. The visible circle IS the kill zone - draw it at the
+    // exact stingReach radius so the player can see where the sting lands.
     if (T.state === "active") {
-      const pulse = 1 + Math.abs(Math.sin(frame * 0.5));
-      ctx.fillStyle = "rgba(255,240,120,0.35)";
-      ctx.beginPath(); ctx.arc(tipX, tipY, 7 * pulse, 0, 7); ctx.fill();
+      const pulse = 0.85 + 0.15 * Math.sin(frame * 0.6);
+      ctx.fillStyle = "rgba(255,240,120,0.30)";
+      ctx.beginPath(); ctx.arc(tipX, tipY, S.stingReach * pulse, 0, 7); ctx.fill();
+      ctx.strokeStyle = "rgba(255,232,110,0.75)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(tipX, tipY, S.stingReach, 0, 7); ctx.stroke();
     } else if (T.state === "windup") {
-      // Softer glow so the player can see it coming without feeling cheated.
-      ctx.fillStyle = "rgba(255,200,80,0.22)";
-      ctx.beginPath(); ctx.arc(tipX, tipY, 5, 0, 7); ctx.fill();
+      // Softer preview of the same circle so the danger is telegraphed.
+      ctx.fillStyle = "rgba(255,200,80,0.12)";
+      ctx.beginPath(); ctx.arc(tipX, tipY, S.stingReach, 0, 7); ctx.fill();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "rgba(255,210,110,0.55)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(tipX, tipY, S.stingReach, 0, 7); ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     ctx.restore();
   },
 
+  drawAnchor(ctx, a, frame) {
+    const s = a.scale;
+    const W = CFG.world;
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    ctx.scale(s, s);
+
+    // Ring at the top - a small circle you can see the water through.
+    ctx.strokeStyle = "#3a2f22"; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.arc(0, -18, 5, 0, 7); ctx.stroke();
+
+    // Crossbar (the top piece of the anchor's stock).
+    ctx.fillStyle = "#5b4a35";
+    ctx.beginPath();
+    ctx.moveTo(-13, -10); ctx.lineTo(13, -10); ctx.lineTo(11, -6); ctx.lineTo(-11, -6);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#2a1e12"; ctx.lineWidth = 1; ctx.stroke();
+
+    // Shaft straight down.
+    ctx.fillStyle = "#6b573f";
+    ctx.beginPath();
+    ctx.moveTo(-2.4, -13); ctx.lineTo(2.4, -13); ctx.lineTo(2.4, 12); ctx.lineTo(-2.4, 12);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#3a2f22"; ctx.lineWidth = 1; ctx.stroke();
+
+    // Two curved flukes at the bottom, cartoon-thick.
+    ctx.fillStyle = "#5b4a35";
+    ctx.beginPath();
+    ctx.moveTo(-2, 10);
+    ctx.quadraticCurveTo(-18, 12, -20, 22);
+    ctx.quadraticCurveTo(-11, 18, -2, 16);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#2a1e12"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(2, 10);
+    ctx.quadraticCurveTo(18, 12, 20, 22);
+    ctx.quadraticCurveTo(11, 18, 2, 16);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#2a1e12"; ctx.lineWidth = 1; ctx.stroke();
+
+    // Fluke tips - small triangular barbs.
+    ctx.fillStyle = "#7a6647";
+    ctx.beginPath(); ctx.moveTo(-20, 22); ctx.lineTo(-22, 19); ctx.lineTo(-18, 19); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(20, 22); ctx.lineTo(22, 19); ctx.lineTo(18, 19); ctx.closePath(); ctx.fill();
+
+    ctx.restore();
+
+    // Surface splash right after the drop - a couple of white arcs above the
+    // water line so the entry has some visual punch.
+    if (a.splash > 0) {
+      const alpha = a.splash / 0.35;
+      ctx.fillStyle = "rgba(200,235,255," + (0.7 * alpha).toFixed(2) + ")";
+      for (let i = -2; i <= 2; i++) {
+        const px = a.x + i * 8;
+        const py = W.waterTop - Math.abs(i) * 3;
+        ctx.beginPath(); ctx.arc(px, py, 3, 0, 7); ctx.fill();
+      }
+    }
+  },
+
   drawPlayer(ctx, p, state) {
     const frame = state.frame;
-    let alpha = 1, scale = 1, showBody = true, showName = true, vaporSparks = false, stungSparks = false;
+    let alpha = 1, scale = 1, showBody = true, showName = true, vaporSparks = false, stungSparks = false, anchorSquash = 0;
 
     if (!p.alive) {
       const age = state.t - (p.deathT || 0);
@@ -263,6 +330,14 @@ export const Render = {
         scale = 1 - t * 0.7;
         stungSparks = true;
         showName = false;
+      } else if (p.deathKind === "anchor") {
+        // Anchored: squish downward, then vanish.
+        const dur = CFG.fx.anchorDur;
+        if (age >= dur) return;
+        const t = age / dur;
+        alpha = 1 - t * 0.6;
+        anchorSquash = t;
+        showName = false;
       } else {
         // Eaten: quick shrink into the shark's jaws.
         const dur = CFG.fx.eatDur;
@@ -279,7 +354,9 @@ export const Render = {
     const wob = Math.sin(frame * 0.3 + p.id) * 3;
     ctx.save();
     ctx.translate(p.x, p.y + (p.alive ? wob : 0));
-    ctx.scale(scale, scale);
+    // Anchor squash: flatten Y, widen X - a cartoon "pancake" moment.
+    if (anchorSquash > 0) ctx.scale(scale * (1 + anchorSquash * 0.4), scale * (1 - anchorSquash * 0.75));
+    else ctx.scale(scale, scale);
 
     if (vaporSparks) {
       // faint rising motes as the swimmer dissolves
@@ -575,6 +652,11 @@ export const Render = {
       for (const r of state.stingrays) Render.drawStingray(ctx, r, state.frame);
     }
 
+    // --- anchors (drawn in front so nothing overlaps the falling body) ---
+    if (state.anchors) {
+      for (const a of state.anchors) Render.drawAnchor(ctx, a, state.frame);
+    }
+
     // --- sharks + lasers ---
     for (const sh of state.sharks) {
       const charging = sh.laser.state === "windup";
@@ -614,9 +696,10 @@ export const Render = {
       const tier = Math.floor(state.t / CFG.shark.tierSeconds) + 1;
       const spd = Sim._speedMul(state.t).toFixed(2);
       const rayCount = (state.stingrays && state.stingrays.length) || 0;
+      const anchorCount = (state.anchors && state.anchors.length) || 0;
       const hazardBit = state.hazards === "sharks-only"
         ? `sharks ${state.sharks.length}`
-        : `sharks ${state.sharks.length} \u2022 rays ${rayCount}`;
+        : `sharks ${state.sharks.length} \u2022 rays ${rayCount} \u2022 anchors ${anchorCount}`;
       label(`Size tier ${tier}   \u2022   tempo x${spd}   \u2022   ${hazardBit}`, W.w - 16, "right");
     } else {
       label(`Swimming: ${aliveCount}`, W.w - 16, "right");
