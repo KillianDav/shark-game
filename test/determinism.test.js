@@ -50,7 +50,11 @@ function scrub(v) {
   if (v && typeof v === 'object') {
     const out = {};
     for (const [k, val] of Object.entries(v)) {
-      if (k === 'rng') continue;
+      // rng is a closure (unserialisable); diff is a resolved snapshot of the
+      // difficulty preset (a copy of CFG) and would bloat the fixture and
+      // couple it to unrelated CFG tuning changes - exclude both from the
+      // comparison.
+      if (k === 'rng' || k === 'diff') continue;
       const sv = scrub(val);
       if (sv !== undefined) out[k] = sv;
     }

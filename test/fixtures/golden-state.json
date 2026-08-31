@@ -2,6 +2,7 @@
   "seed": 12345,
   "mode": "party",
   "hazards": "all",
+  "difficulty": "medium",
   "decor": [
     {
       "type": "chest",
@@ -318,7 +319,7 @@
       "id": 3,
       "x": 298,
       "y": 685,
-      "vy": 55,
+      "vy": 130,
       "color": "#c084fc",
       "spawnT": 14.466667
     }

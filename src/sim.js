@@ -55,7 +55,11 @@ export const CFG = {
     laserCooldownMin: 1.2, laserCooldownMax: 3.0,
     laserWindup: 0.5,            // eyes glow before firing (telegraph, harmless)
     laserActive: 0.5,            // beam is lethal this long
-    laserRange: 1000, laserBand: 4,   // half the visible beam thickness (kill only on visual touch)
+    // Laser: laserBand is the half-thickness of the KILL zone and must match
+    // the visible beam's rendered half-width (drawSharkLaser uses lineWidth 5,
+    // so the visible half is 2.5). Any bigger and the player dies with a
+    // visible gap between beam and fish.
+    laserRange: 1000, laserBand: 2.5,
     chomp: 0.42                  // seconds a shark holds its jaws open after a bite
   },
   stingray: {
@@ -81,10 +85,10 @@ export const CFG = {
   },
   coffin: {
     // Cartoon coffin dropped at the death spot when a life is lost. Sinks
-    // slowly to the seabed and lingers as a visible mark, then fades out.
-    fallSpeed: 55,          // px/s downward while sinking
-    fadeStart: 3.5,         // seconds from spawn before fading begins
-    lifetime: 5.5           // seconds after spawn until the coffin is culled
+    // to the seabed and lingers as a visible mark, then fades out.
+    fallSpeed: 130,         // px/s downward while sinking (falls quickly)
+    fadeStart: 2.5,         // seconds from spawn before fading begins
+    lifetime: 4.0           // seconds after spawn until the coffin is culled
   },
   anchor: {
     // Rare falling anchor. Drops through the water from the surface at a
@@ -92,10 +96,10 @@ export const CFG = {
     // near-miss to the left or right passes harmlessly.
     earliestT: 12,                // no anchors early game
     spawnMin: 8, spawnMax: 16,    // steady cadence with randomness
-    minSpeed: 130, maxSpeed: 190, // downward fall speed
+    minSpeed: 70, maxSpeed: 110,  // slower fall so the player has time to dodge
     spawnJitter: 60,              // half-width of the horizontal spawn band around the lane
     bodyRadius: 20,               // effective anchor hitbox radius (paired with player rx/ry)
-    scaleMin: 1.15, scaleMax: 1.4
+    scaleMin: 1.8, scaleMax: 2.2  // bigger, more menacing anchor
   },
   // Gentle, shared speed-up applied to BOTH shark travel speed and player
   // vertical agility, so the tempo rises but dodging stays just as feasible.
@@ -103,6 +107,62 @@ export const CFG = {
   fx: { vaporDur: 0.8, eatDur: 0.3, stingDur: 0.45, anchorDur: 0.55 },  // laser vaporise, eaten shrink, stung flicker, anchor squish
   fixedDt: 1 / 60
 };
+
+// --------------------------------------------------------------------------
+// DIFFICULTY PRESETS
+// --------------------------------------------------------------------------
+// Each preset overrides a small, curated set of CFG knobs that shape the
+// pacing (spawn cadence, ramp speed, tempo, hazard timings, laser aggression,
+// size-tier growth). CFG itself is the medium tuning, so DIFFICULTIES.medium
+// is intentionally empty. Sim.createState resolves the chosen preset into
+// `state.diff` (a per-round override that Sim helpers read from), so the
+// live game never has to consult CFG for these knobs.
+//
+// To tweak difficulty: add or edit the sparse override in the appropriate
+// preset - do NOT edit CFG unless you mean to shift the medium baseline.
+export const DIFFICULTIES = {
+  easy: {
+    label: "Easy",
+    shark: {
+      spawnStart: 3.0, spawnMin: 0.55,
+      rampTime: 36, rampEase: 0.75,
+      laserChance: 0.38, laserCooldownMin: 1.8, laserCooldownMax: 4.0,
+      sizeStepPerTier: 0.13, tierSeconds: 20, scaleCap: 3.0
+    },
+    stingray: { earliestT: 8, spawnMin: 6.5, spawnMax: 11, maxOnScreen: 1 },
+    anchor:   { earliestT: 20, spawnMin: 14, spawnMax: 24 },
+    progression: { speedPerSec: 0.013, speedMax: 2.0 }
+  },
+  medium: {
+    label: "Medium"
+    // (no overrides: CFG defaults are the medium tuning)
+  },
+  fiendish: {
+    label: "Fiendish",
+    shark: {
+      spawnStart: 1.2, spawnMin: 0.18,
+      rampTime: 18, rampEase: 0.5,
+      laserChance: 0.75, laserCooldownMin: 0.8, laserCooldownMax: 2.0,
+      sizeStepPerTier: 0.22, tierSeconds: 10, scaleCap: 3.8
+    },
+    stingray: { earliestT: 3, spawnMin: 3.0, spawnMax: 5.0, maxOnScreen: 3 },
+    anchor:   { earliestT: 8,  spawnMin: 5,  spawnMax: 11 },
+    progression: { speedPerSec: 0.028, speedMax: 3.0 }
+  }
+};
+
+// Resolve a difficulty name into a fully-populated per-state override that
+// Sim helpers can read from. Falls back to medium (i.e. CFG defaults) for
+// any unknown difficulty name.
+function _resolveDiff(name) {
+  const preset = DIFFICULTIES[name] || DIFFICULTIES.medium;
+  return {
+    shark:       { ...CFG.shark,       ...(preset.shark       || {}) },
+    stingray:    { ...CFG.stingray,    ...(preset.stingray    || {}) },
+    anchor:      { ...CFG.anchor,      ...(preset.anchor      || {}) },
+    progression: { ...CFG.progression, ...(preset.progression || {}) }
+  };
+}
 
 // ==========================================================================
 //  SIM  - pure logic. Everything here is a function of (state, inputs, dt).
@@ -148,10 +208,14 @@ export const Sim = {
       dx += 55 + rng() * 95;
     }
 
+    const difficulty = DIFFICULTIES[config.difficulty] ? config.difficulty : "medium";
+    const diff = _resolveDiff(difficulty);
     return {
       seed, rng,
       mode,                                // "party" | "solo"
       hazards: config.hazards || "all",   // "all" (sharks + stingrays + anchors) | "sharks-only" (classic)
+      difficulty,                          // "easy" | "medium" | "fiendish"
+      diff,                                // resolved CFG-shaped overrides (see _resolveDiff); excluded from JSON snapshots
       decor,
       t: 0, frame: 0,
       status: "playing",          // "playing" | "over"
@@ -165,36 +229,37 @@ export const Sim = {
       nextStingrayId: 1,
       nextAnchorId: 1,
       nextCoffinId: 1,
-      spawnTimer: 0.8,            // shark spawn cadence
-      raySpawnTimer: CFG.stingray.earliestT,   // first ray no earlier than earliestT
-      anchorSpawnTimer: CFG.anchor.earliestT,  // first anchor no earlier than earliestT
+      spawnTimer: 0.8,                          // shark spawn cadence
+      raySpawnTimer: diff.stingray.earliestT,   // first ray no earlier than earliestT
+      anchorSpawnTimer: diff.anchor.earliestT,  // first anchor no earlier than earliestT
       winnerId: null
     };
   },
 
-  // 0..1 difficulty factor, eased so it climbs quickly early on.
-  _difficulty(t) {
-    const s = CFG.shark;
+  // 0..1 difficulty factor, eased so it climbs quickly early on. Reads the
+  // per-round difficulty preset via state.diff.
+  _difficulty(state, t) {
+    const s = state.diff.shark;
     return Math.pow(clamp(t / s.rampTime, 0, 1), s.rampEase);
   },
 
   // Shared tempo multiplier - gently ramps up over time. Applied to shark
   // travel speed AND player vertical agility so the game stays dodgeable.
-  _speedMul(t) {
-    const p = CFG.progression;
+  _speedMul(state, t) {
+    const p = state.diff.progression;
     return Math.min(p.speedMax, 1 + p.speedPerSec * t);
   },
 
-  // Difficulty-scaled spawn interval.
-  _spawnInterval(t) {
-    const s = CFG.shark;
-    return lerp(s.spawnStart, s.spawnMin, Sim._difficulty(t));
+  // Difficulty-scaled shark spawn interval.
+  _spawnInterval(state, t) {
+    const s = state.diff.shark;
+    return lerp(s.spawnStart, s.spawnMin, Sim._difficulty(state, t));
   },
 
   _spawnShark(state) {
-    const s = CFG.shark, rng = state.rng, W = CFG.world;
-    const k = Sim._difficulty(state.t);
-    const speed = lerp(s.minSpeed, s.maxSpeed, rng()) * Sim._speedMul(state.t);  // gentle, mirrored by players
+    const s = state.diff.shark, rng = state.rng, W = CFG.world;
+    const k = Sim._difficulty(state, state.t);
+    const speed = lerp(s.minSpeed, s.maxSpeed, rng()) * Sim._speedMul(state, state.t);  // gentle, mirrored by players
     const startX = W.w + 60;
     const swimT = rng() * 10;
     const waveAmp = lerp(s.waveAmpMin, s.waveAmpMax, rng()) * (0.7 + 0.5 * k);  // weave more late-game
@@ -236,8 +301,8 @@ export const Sim = {
   _eye(sh) { const s = sh.scale || 1.7; return { x: sh.x - 16 * s, y: sh.y - 4 * s }; },
 
   _spawnStingray(state) {
-    const R = CFG.stingray, rng = state.rng, W = CFG.world;
-    const speed = lerp(R.minSpeed, R.maxSpeed, rng()) * Sim._speedMul(state.t);
+    const R = state.diff.stingray, rng = state.rng, W = CFG.world;
+    const speed = lerp(R.minSpeed, R.maxSpeed, rng()) * Sim._speedMul(state, state.t);
     const startX = W.w + 60;
     const swimT = rng() * 10;
     const waveAmp = lerp(R.waveAmpMin, R.waveAmpMax, rng());
@@ -269,8 +334,8 @@ export const Sim = {
   },
 
   _spawnAnchor(state) {
-    const A = CFG.anchor, rng = state.rng, W = CFG.world;
-    const vy = lerp(A.minSpeed, A.maxSpeed, rng()) * Sim._speedMul(state.t);
+    const A = state.diff.anchor, rng = state.rng, W = CFG.world;
+    const vy = lerp(A.minSpeed, A.maxSpeed, rng()) * Sim._speedMul(state, state.t);
     // Drop within a horizontal band around the player lane so anchors are
     // dodgeable in Y but actually threaten someone (an anchor over empty water
     // would just be scenery).
@@ -335,16 +400,17 @@ export const Sim = {
 
   step(state, humanInputs, dt) {
     if (state.status === "over") return state;
-    const W = CFG.world, P = CFG.player, S = CFG.shark, R = CFG.stingray, A = CFG.anchor;
+    const W = CFG.world, P = CFG.player;
+    const S = state.diff.shark, R = state.diff.stingray, A = state.diff.anchor;
     state.t += dt;
     state.frame++;
-    const m = Sim._speedMul(state.t);   // shared tempo: players get faster with the sharks
+    const m = Sim._speedMul(state, state.t);   // shared tempo: players get faster with the sharks
 
-    // --- spawn sharks (unchanged; sharks are the dominant hazard) ---
+    // --- spawn sharks (dominant hazard; cadence set by difficulty) ---
     state.spawnTimer -= dt;
     if (state.spawnTimer <= 0) {
       Sim._spawnShark(state);
-      state.spawnTimer += Sim._spawnInterval(state.t);
+      state.spawnTimer += Sim._spawnInterval(state, state.t);
     }
 
     // --- spawn stingrays on their own steady-with-jitter timer ---

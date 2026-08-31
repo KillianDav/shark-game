@@ -85,6 +85,11 @@ function currentMode() {
   return sel ? sel.value : "party";
 }
 
+function currentDifficulty() {
+  const sel = document.querySelector('input[name="difficulty"]:checked');
+  return sel ? sel.value : "medium";
+}
+
 function startGame() {
   const mode = currentMode();
   const names = parseNames();
@@ -92,7 +97,8 @@ function startGame() {
   const players = buildPlayers(names, botCount, mode);
   const hazards = els.stingraysToggle && els.stingraysToggle.checked ? "all" : "sharks-only";
   const lives = clamp(parseInt(els.livesCount.value, 10) || 1, 1, 9);
-  const config = { players, mode, hazards, lives, seed: (Date.now() & 0xffffffff) };
+  const difficulty = currentDifficulty();
+  const config = { players, mode, hazards, lives, difficulty, seed: (Date.now() & 0xffffffff) };
   game.lastConfig = { names, botCount };
 
   game.transport = LocalTransport();
@@ -149,7 +155,7 @@ function endGame(state) {
   if (state.mode === "solo") {
     const survived = (winner && winner.deathT != null ? winner.deathT : state.t);
     const tier = Math.floor(survived / CFG.shark.tierSeconds) + 1;
-    const spd = Sim._speedMul(survived).toFixed(2);
+    const spd = Sim._speedMul(state, survived).toFixed(2);
     const how = winner && winner.deathKind === "laser" ? "lasered"
               : winner && winner.deathKind === "stung" ? "stung by a ray"
               : winner && winner.deathKind === "anchor" ? "anchored"

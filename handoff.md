@@ -72,6 +72,12 @@ Runs 22 tests via Node's built-in `node:test` (needs Node ≥ 20). Zero dependen
 
 `CFG` (all tunables) is at the top of `src/sim.js`.
 
+## Difficulty presets
+
+Difficulty is picked per-round on the setup screen (`config.difficulty: "easy" | "medium" | "fiendish"`, default `"medium"`) and resolved into `state.diff` via `_resolveDiff` in `src/sim.js`. `state.diff` is CFG-shaped (`{ shark, stingray, anchor, progression }`) but reflects the chosen preset's overrides, and every Sim helper that touches pacing reads from `state.diff` rather than `CFG` directly (`_difficulty`, `_speedMul`, `_spawnInterval`, `_spawnShark`, `_spawnStingray`, `_spawnAnchor`, the spawn / tick blocks in `step`, and the HUD readouts in `render.js`).
+
+**To tweak or add a difficulty:** edit `DIFFICULTIES` in `src/sim.js`. Medium is intentionally empty (`{}`) so the CFG defaults ARE the medium tuning — don't edit CFG unless you mean to shift the medium baseline. `state.diff` is excluded from the determinism fixture (see `test/determinism.test.js`) so changing CFG tuning won't force a fixture regen unless you also changed the medium behaviour.
+
 ## Architecture (the multiplayer seam)
 
 Four layers, one file each under `src/`. The boundary is enforced by `import` statements now — respect it.
@@ -187,7 +193,7 @@ If you change `Sim` behaviour, `test/fixtures/golden-state.json` will fail. That
 ## Quick map (where to find things)
 
 - **Tunables** — `CFG` at the top of `src/sim.js`.
-- **Sim** — `src/sim.js`: `createState`, `step`, `_spawnShark`, `_spawnStingray`, `_spawnAnchor`, `_stingTip`, `_botIntent`, `_resolveWinner`, `_difficulty`, `_speedMul`, `_spawnInterval`, `_eye`, `_kill`.
+- **Sim** — `src/sim.js`: `DIFFICULTIES`, `createState`, `step`, `_spawnShark`, `_spawnStingray`, `_spawnAnchor`, `_stingTip`, `_botIntent`, `_resolveWinner`, `_difficulty(state, t)`, `_speedMul(state, t)`, `_spawnInterval(state, t)`, `_eye`, `_kill`, `_dropCoffin`.
 - **Render** — `src/render.js`: `drawSharkSprite`, `drawSharkLaser`, `drawWindupCharge`, `drawStingray`, `drawAnchor`, `drawPlayer`, `_waterColorAt`, `_buildSeabed`, `drawSeabed`, `drawState`.
 - **Input** — `src/input.js`: key map, `attach` / `detach` / `intent` / `reset`.
 - **LocalTransport** — `src/transport-local.js`: in-tab sim.

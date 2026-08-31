@@ -38,6 +38,12 @@ respawns you in place with a brief invulnerability flash. A little **coffin**
 drops at the death spot and sinks toward the seabed as a clear visual record
 of where the death happened.
 
+**Difficulty** on the setup screen picks a preset — Easy, Medium (default),
+or Fiendish — that shifts the spawn cadence, tempo ramp, shark size growth,
+laser aggression, and stingray/anchor timings together. See
+`DIFFICULTIES` in `src/sim.js` to tweak or add a preset; the medium tuning
+is `CFG`'s defaults, so easy and fiendish are sparse overrides on top.
+
 Uncheck **Include stingrays** on the setup screen for classic laser-sharks-only
 play. In the default mode: rays start after ~5 s (steady 4.5-7 s cadence, cap of
 2 on screen), anchors start after ~12 s (8-16 s cadence). Sharks-only mode

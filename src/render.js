@@ -149,41 +149,51 @@ export const Render = {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(cf.x, cf.y);
-    // Sinking wobble so the drop feels like it's tumbling gently.
-    ctx.rotate(Math.sin((cf.spawnT + state.t) * 1.8 + cf.id) * 0.08);
+    // Gentle sinking wobble so the drop feels like it's tumbling.
+    ctx.rotate(Math.sin((cf.spawnT + state.t) * 1.6 + cf.id) * 0.06);
 
-    // Shadow (subtle circle underneath).
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
-    ctx.beginPath(); ctx.ellipse(0, 12, 12, 2.5, 0, 0, 7); ctx.fill();
-
-    // Coffin body - hex-shaped brown box.
+    // Coffin silhouette - proper elongated hexagon: narrow head + foot,
+    // widening at the shoulders. Traditional "toe-pincher" coffin shape.
+    //
+    //          .___.     <- head (narrow)
+    //         /     \
+    //        /       \
+    //       |         |  <- shoulders (widest)
+    //       |         |
+    //        \       /
+    //         \     /
+    //          '---'     <- foot (narrow)
+    //
     ctx.fillStyle = "#5b3a1c";
     ctx.beginPath();
-    ctx.moveTo(-8, -12);
-    ctx.lineTo(8, -12);
-    ctx.lineTo(10, -8);
-    ctx.lineTo(10, 8);
-    ctx.lineTo(8, 12);
-    ctx.lineTo(-8, 12);
-    ctx.lineTo(-10, 8);
-    ctx.lineTo(-10, -8);
+    ctx.moveTo(-4, -17);      // head top-left
+    ctx.lineTo(4, -17);       // head top-right
+    ctx.lineTo(8, -9);        // shoulder right-upper
+    ctx.lineTo(8, 9);         // shoulder right-lower
+    ctx.lineTo(4, 17);        // foot bottom-right
+    ctx.lineTo(-4, 17);       // foot bottom-left
+    ctx.lineTo(-8, 9);        // shoulder left-lower
+    ctx.lineTo(-8, -9);       // shoulder left-upper
     ctx.closePath(); ctx.fill();
     ctx.strokeStyle = "#2f1f10"; ctx.lineWidth = 1.2; ctx.stroke();
 
-    // Wood-grain lid seam.
+    // Lid seams (top + bottom bevels).
     ctx.strokeStyle = "#3d2510"; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.moveTo(-9, -6); ctx.lineTo(9, -6); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-9, 6); ctx.lineTo(9, 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-4, -17); ctx.lineTo(-8, -9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(4, -17); ctx.lineTo(8, -9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8, 9); ctx.lineTo(-4, 17); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8, 9); ctx.lineTo(4, 17); ctx.stroke();
 
-    // Cross on the lid.
+    // Cross on the lid, upper third (traditional placement).
     ctx.fillStyle = "#e8dfcc";
-    ctx.fillRect(-1.2, -6, 2.4, 12);
-    ctx.fillRect(-4.5, -2, 9, 2.4);
+    ctx.fillRect(-1, -12, 2, 12);
+    ctx.fillRect(-3.5, -8, 7, 2.2);
 
-    // Small colour dot in the player's colour so multi-player rounds can see whose coffin.
+    // Small colour dot in the player's colour (foot end) so party rounds can
+    // see whose coffin sank where.
     if (cf.color) {
       ctx.fillStyle = cf.color;
-      ctx.beginPath(); ctx.arc(0, 8, 1.6, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 12, 1.6, 0, 7); ctx.fill();
     }
 
     ctx.restore();
@@ -630,7 +640,7 @@ export const Render = {
     // scroll speed to the shared tempo multiplier so the world rushes by
     // faster as the difficulty ramps.
     const tileW = W.w;
-    const scrollX = state.t * W.scrollSpeed * Sim._speedMul(state.t);
+    const scrollX = state.t * W.scrollSpeed * Sim._speedMul(state, state.t);
     const offset = ((scrollX % tileW) + tileW) % tileW;
 
     // Dune ridge silhouette — evaluated in world coords so the ridge
@@ -763,8 +773,8 @@ export const Render = {
       ctx.fillStyle = "#ff8a9a"; ctx.fillText(`Lives ${hearts}`, 130, 26);
     }
     if (state.mode === "solo") {
-      const tier = Math.floor(state.t / CFG.shark.tierSeconds) + 1;
-      const spd = Sim._speedMul(state.t).toFixed(2);
+      const tier = Math.floor(state.t / state.diff.shark.tierSeconds) + 1;
+      const spd = Sim._speedMul(state, state.t).toFixed(2);
       const rayCount = (state.stingrays && state.stingrays.length) || 0;
       const anchorCount = (state.anchors && state.anchors.length) || 0;
       const hazardBit = state.hazards === "sharks-only"
