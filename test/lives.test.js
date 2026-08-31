@@ -6,26 +6,33 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CFG, Sim } from '../src/sim.js';
 
-test('solo starts with 3 lives; party starts with 1', () => {
-  const solo = Sim.createState({ seed: 1, mode: 'solo', players: [{ name: 'A' }] });
-  const party = Sim.createState({ seed: 1, mode: 'party', players: [{ name: 'A' }, { name: 'B', isBot: true }] });
-  assert.equal(solo.players[0].lives, CFG.player.livesSolo);
-  for (const p of party.players) assert.equal(p.lives, CFG.player.livesParty);
+test('config.lives applies to every player (solo and party); default is 1', () => {
+  const defSolo = Sim.createState({ seed: 1, mode: 'solo', players: [{ name: 'A' }] });
+  const defParty = Sim.createState({ seed: 1, mode: 'party', players: [{ name: 'A' }, { name: 'B', isBot: true }] });
+  assert.equal(defSolo.players[0].lives, 1);
+  for (const p of defParty.players) assert.equal(p.lives, 1);
+
+  const bigSolo = Sim.createState({ seed: 1, mode: 'solo', lives: 3, players: [{ name: 'A' }] });
+  const bigParty = Sim.createState({ seed: 1, mode: 'party', lives: 5, players: [{ name: 'A' }, { name: 'B', isBot: true }] });
+  assert.equal(bigSolo.players[0].lives, 3);
+  for (const p of bigParty.players) assert.equal(p.lives, 5);
+  assert.equal(bigSolo.initialLives, 3);
+  assert.equal(bigParty.initialLives, 5);
 });
 
-test('losing a life in solo keeps the player alive and grants invuln', () => {
-  const s = Sim.createState({ seed: 1, mode: 'solo', players: [{ name: 'A' }] });
+test('losing a life with extras keeps the player alive and grants invuln', () => {
+  const s = Sim.createState({ seed: 1, mode: 'solo', lives: 3, players: [{ name: 'A' }] });
   const p = s.players[0];
   Sim._kill(s, p, 'eaten', p.x, p.y);
   assert.equal(p.alive, true, 'still alive with lives remaining');
-  assert.equal(p.lives, CFG.player.livesSolo - 1);
+  assert.equal(p.lives, 2);
   assert.ok(p.invuln > 0, 'invuln armed after the hit');
 });
 
 test('further hits during invuln are absorbed (no life loss)', () => {
-  const s = Sim.createState({ seed: 1, mode: 'solo', players: [{ name: 'A' }] });
+  const s = Sim.createState({ seed: 1, mode: 'solo', lives: 3, players: [{ name: 'A' }] });
   const p = s.players[0];
-  Sim._kill(s, p, 'eaten', p.x, p.y);   // lives 3 -> 2, invuln armed
+  Sim._kill(s, p, 'eaten', p.x, p.y);
   const livesAfterFirst = p.lives;
   Sim._kill(s, p, 'laser', p.x, p.y);   // absorbed
   Sim._kill(s, p, 'stung', p.x, p.y);   // absorbed
@@ -34,10 +41,9 @@ test('further hits during invuln are absorbed (no life loss)', () => {
 });
 
 test('the final life ends the game in solo mode', () => {
-  const s = Sim.createState({ seed: 1, mode: 'solo', players: [{ name: 'A' }] });
+  const s = Sim.createState({ seed: 1, mode: 'solo', lives: 3, players: [{ name: 'A' }] });
   const p = s.players[0];
-  // Bypass invuln between manual kills so each one lands.
-  for (let i = 0; i < CFG.player.livesSolo; i++) {
+  for (let i = 0; i < s.initialLives; i++) {
     p.invuln = 0;
     Sim._kill(s, p, 'eaten', p.x, p.y);
   }
@@ -48,14 +54,27 @@ test('the final life ends the game in solo mode', () => {
 });
 
 test('invuln ticks down each step and expires', () => {
-  const s = Sim.createState({ seed: 1, mode: 'solo', players: [{ name: 'A' }] });
+  const s = Sim.createState({ seed: 1, mode: 'solo', lives: 3, players: [{ name: 'A' }] });
   const p = s.players[0];
   s.spawnTimer = 1e6;
   Sim._kill(s, p, 'eaten', p.x, p.y);
   const start = p.invuln;
   Sim.step(s, { 0: { up: 0, down: 0 } }, 1 / 60);
   assert.ok(p.invuln < start, 'invuln timer should have ticked down');
-  // Fast-forward past the invuln window.
   for (let i = 0; i < 200; i++) Sim.step(s, { 0: { up: 0, down: 0 } }, 1 / 60);
   assert.equal(p.invuln, 0, 'invuln should have fully expired');
+});
+
+test('a lost life drops a coffin at the player position that sinks toward the seabed', () => {
+  const s = Sim.createState({ seed: 1, mode: 'solo', lives: 2, players: [{ name: 'A' }] });
+  const p = s.players[0];
+  const py = p.y;
+  Sim._kill(s, p, 'eaten', 0, 0);
+  assert.equal(s.coffins.length, 1, 'coffin dropped when a life is lost');
+  const cf = s.coffins[0];
+  assert.equal(cf.x, p.x);
+  assert.equal(cf.y, py);
+  const startY = cf.y;
+  for (let i = 0; i < 60; i++) Sim.step(s, { 0: { up: 0, down: 0 } }, 1 / 60);
+  assert.ok(s.coffins[0].y > startY, 'coffin should have sunk');
 });

@@ -141,6 +141,54 @@ export const Render = {
     ctx.shadowBlur = 0;
   },
 
+  drawCoffin(ctx, cf, state) {
+    const C = CFG.coffin;
+    const age = state.t - cf.spawnT;
+    const fadeT = Math.max(0, (age - C.fadeStart) / Math.max(0.001, C.lifetime - C.fadeStart));
+    const alpha = 1 - Math.min(1, fadeT);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(cf.x, cf.y);
+    // Sinking wobble so the drop feels like it's tumbling gently.
+    ctx.rotate(Math.sin((cf.spawnT + state.t) * 1.8 + cf.id) * 0.08);
+
+    // Shadow (subtle circle underneath).
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath(); ctx.ellipse(0, 12, 12, 2.5, 0, 0, 7); ctx.fill();
+
+    // Coffin body - hex-shaped brown box.
+    ctx.fillStyle = "#5b3a1c";
+    ctx.beginPath();
+    ctx.moveTo(-8, -12);
+    ctx.lineTo(8, -12);
+    ctx.lineTo(10, -8);
+    ctx.lineTo(10, 8);
+    ctx.lineTo(8, 12);
+    ctx.lineTo(-8, 12);
+    ctx.lineTo(-10, 8);
+    ctx.lineTo(-10, -8);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#2f1f10"; ctx.lineWidth = 1.2; ctx.stroke();
+
+    // Wood-grain lid seam.
+    ctx.strokeStyle = "#3d2510"; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(-9, -6); ctx.lineTo(9, -6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-9, 6); ctx.lineTo(9, 6); ctx.stroke();
+
+    // Cross on the lid.
+    ctx.fillStyle = "#e8dfcc";
+    ctx.fillRect(-1.2, -6, 2.4, 12);
+    ctx.fillRect(-4.5, -2, 9, 2.4);
+
+    // Small colour dot in the player's colour so multi-player rounds can see whose coffin.
+    if (cf.color) {
+      ctx.fillStyle = cf.color;
+      ctx.beginPath(); ctx.arc(0, 8, 1.6, 0, 7); ctx.fill();
+    }
+
+    ctx.restore();
+  },
+
   drawStingray(ctx, r, frame) {
     const S = CFG.stingray;
     const s = r.scale;
@@ -652,6 +700,11 @@ export const Render = {
       ctx.beginPath(); ctx.arc(W.w - bx, by, 2 + (i % 3), 0, 7); ctx.fill();
     }
 
+    // --- coffins (behind hazards so they don't obscure gameplay) ---
+    if (state.coffins) {
+      for (const cf of state.coffins) Render.drawCoffin(ctx, cf, state);
+    }
+
     // --- stingrays (drawn behind sharks so sharks stay visually dominant) ---
     if (state.stingrays) {
       for (const r of state.stingrays) Render.drawStingray(ctx, r, state.frame);
@@ -696,18 +749,20 @@ export const Render = {
     };
     ctx.font = "bold 16px 'Segoe UI', sans-serif";
     label(`Time ${state.t.toFixed(1)}s`, 15, "left");
+    // Human player's hearts, shown whenever the round starts with > 1 life.
+    // In solo the human is state.players[0]; in party the human is the first
+    // non-bot player (falling back to the first player if none flagged human).
+    const human = state.players.find((p) => !p.isBot) || state.players[0];
+    const initialLives = state.initialLives || 1;
+    if (human && initialLives > 1) {
+      const filled = Math.max(0, human.lives);
+      const hearts = "\u2665".repeat(filled) + "\u2661".repeat(Math.max(0, initialLives - filled));
+      ctx.font = "bold 16px 'Segoe UI', sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillText(`Lives ${hearts}`, 130 + 1, 27);
+      ctx.fillStyle = "#ff8a9a"; ctx.fillText(`Lives ${hearts}`, 130, 26);
+    }
     if (state.mode === "solo") {
-      // Solo shows a lives readout on the left (after time) and difficulty on the right.
-      const p = state.players[0];
-      if (p) {
-        const total = CFG.player.livesSolo;
-        const filled = Math.max(0, p.lives);
-        const hearts = "\u2665".repeat(filled) + "\u2661".repeat(Math.max(0, total - filled));
-        ctx.font = "bold 16px 'Segoe UI', sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillText(`Lives ${hearts}`, 130 + 1, 27);
-        ctx.fillStyle = "#ff8a9a"; ctx.fillText(`Lives ${hearts}`, 130, 26);
-      }
       const tier = Math.floor(state.t / CFG.shark.tierSeconds) + 1;
       const spd = Sim._speedMul(state.t).toFixed(2);
       const rayCount = (state.stingrays && state.stingrays.length) || 0;

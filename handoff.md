@@ -43,7 +43,11 @@ Runs 22 tests via Node's built-in `node:test` (needs Node ≥ 20). Zero dependen
 
 **Modes:**
 - **Party:** first name in the list is the human (↑/↓ or W/S). Other names + practice bots are AI. Last one swimming wins.
-- **Solo survival:** you swim alone with `CFG.player.livesSolo` lives (default 3). Each hit spends a life; on non-final hits the player respawns in place with `CFG.player.invulnDur` seconds of i-frames (rendered as an alpha flash). Final hit sets `alive=false` and the game ends. HUD shows `Lives ♥♥♥`, `Size tier`, `tempo xN`, and `sharks K • rays K • anchors K` (or just `sharks K` in classic mode). Result is total survival time.
+- **Solo survival:** you swim alone. HUD shows `Size tier`, `tempo xN`, and `sharks K • rays K • anchors K` (or just `sharks K` in classic mode). Result is total survival time.
+
+**Lives** are configured per-round on the setup screen and applied to every player in both modes (`config.lives`, default 1, `state.initialLives`). With more than 1 life, each hit spends one via `Sim._kill` (arms `p.invuln = CFG.player.invulnDur`), the player continues from the same spot with `vy = 0`, and a coffin is dropped at the death location (`Sim._dropCoffin`, sinks per `CFG.coffin.fallSpeed`, culled after `CFG.coffin.lifetime`). The HUD hearts readout shows for the human player whenever `state.initialLives > 1`.
+
+**Kill zones (dangerous-part-only rule):** shark teeth only — a tight circle at `sh.x - CFG.shark.teethOffsetX * scale`, radius `CFG.shark.teethR * scale`, tested via circle-vs-ellipse against the player body (so passing through a shark's back/tail is safe); laser only on the visible beam; sting only on the visible ring circle. Anchors are inert objects with no safe part — they kill on any body-overlap.
 
 **Hazards toggle:** the setup checkbox `Include stingrays` maps to `config.hazards: "all" | "sharks-only"` on `Sim.createState`. Default `"all"` unlocks stingrays after `CFG.stingray.earliestT` seconds (4.5-7 s steady cadence, cap of `CFG.stingray.maxOnScreen`) and anchors after `CFG.anchor.earliestT` seconds (8-16 s cadence). `"sharks-only"` skips the ray + anchor spawn timers entirely, keeping the classic laser-sharks-only game.
 

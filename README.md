@@ -3,10 +3,11 @@
 A stand-up picker game. Dodge the laser-eyed sharks coming the other way,
 the tail-whipping stingrays patrolling the lower water, and the occasional
 anchor plunging down from above — the **winner runs the next standup**.
-Sharks eat on contact or fry you with an eye-laser; stingrays glide slowly
-with a wavy motion and telegraph a wide tail-sting circle (the visible glow
-IS the kill zone); anchors drop straight down and only kill on a direct body
-hit. Control your swimmer with the **up / down arrow keys** (W / S also work).
+Only the **dangerous parts** kill: shark **teeth** (a tight circle at the
+front of the head — the body/tail is safe to touch), the **laser beam**,
+the **stingray sting circle** (the visible glow), and a direct **anchor**
+body hit. Control your swimmer with the **up / down arrow keys** (W / S also
+work).
 
 The shark art (and the laser-eye rendering) is ported from the reference
 `standup-lemmings/index-shark.html` game.
@@ -27,12 +28,15 @@ Pick a mode on the setup screen:
 - **Party** — the **first name** in the team list is you (keyboard-controlled)
   and every other name becomes an AI bot swimmer. "Practice bots" adds extra AI
   swimmers. The last one still swimming wins and runs the next standup.
-- **Solo survival** — you swim alone with **3 lives**. Each death, you
-  respawn in place with a short window of invulnerability (the fish flashes
-  while it's safe) so the same hazard doesn't insta-kill again. The HUD shows
-  hearts, size tier, tempo multiplier, and the current shark/ray/anchor
-  counts. The result reports total survival time — ideal for testing the
-  difficulty curve.
+- **Solo survival** — you swim alone. HUD shows size tier, tempo multiplier,
+  and the current shark/ray/anchor counts. The result reports total survival
+  time — ideal for testing the difficulty curve.
+
+The **Lives** number on the setup screen (default **1**) applies to every
+swimmer — solo and party. With more than one life, each hit spends one and
+respawns you in place with a brief invulnerability flash. A little **coffin**
+drops at the death spot and sinks toward the seabed as a clear visual record
+of where the death happened.
 
 Uncheck **Include stingrays** on the setup screen for classic laser-sharks-only
 play. In the default mode: rays start after ~5 s (steady 4.5-7 s cadence, cap of

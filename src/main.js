@@ -24,6 +24,7 @@ const DEFAULT_NAMES = ["Ahmed", "Ben", "Chris", "Dana", "Eve"];
 const els = {
   names: document.getElementById("names"),
   botCount: document.getElementById("botCount"),
+  livesCount: document.getElementById("livesCount"),
   stingraysToggle: document.getElementById("stingraysToggle"),
   startBtn: document.getElementById("startBtn"),
   resetNamesBtn: document.getElementById("resetNamesBtn"),
@@ -90,7 +91,8 @@ function startGame() {
   const botCount = clamp(parseInt(els.botCount.value, 10) || 0, 0, 10);
   const players = buildPlayers(names, botCount, mode);
   const hazards = els.stingraysToggle && els.stingraysToggle.checked ? "all" : "sharks-only";
-  const config = { players, mode, hazards, seed: (Date.now() & 0xffffffff) };
+  const lives = clamp(parseInt(els.livesCount.value, 10) || 1, 1, 9);
+  const config = { players, mode, hazards, lives, seed: (Date.now() & 0xffffffff) };
   game.lastConfig = { names, botCount };
 
   game.transport = LocalTransport();

@@ -29,9 +29,7 @@ export const CFG = {
   world: { w: 1280, h: 720, waterTop: 96, waterBottom: 700, laneX: 250, scrollSpeed: 60 },
   player: {
     accY: 1400, dampY: 7.5, maxVy: 300, rx: 20, ry: 15,
-    // Lives: solo gets 3 attempts (respawn in place after each death); party
-    // stays one-shot (last swimmer wins - lives would defeat the picker rules).
-    livesSolo: 3, livesParty: 1,
+    // Lives are configured per-round on the setup screen (config.lives), default 1.
     invulnDur: 1.5   // seconds of i-frames after losing a life
   },
   shark: {
@@ -46,8 +44,11 @@ export const CFG = {
     sizeStepPerTier: 0.18,  // sharks grow slightly bigger every tierSeconds
     tierSeconds: 15,        // a new, larger size tier arrives on this cadence
     scaleCap: 3.4,          // upper bound on shark size
-    hitRX: 26, hitRY: 12,   // collision ellipse = these * the shark's sprite scale
-    mouthStartX: 4,         // jaws begin this far ahead of center (* scale); behind it is safe
+    // Only the TEETH kill - a tight circle at the front of the head. The rest
+    // of the body (side, back, tail) is safe to touch, so grazing a shark
+    // that's passing through the lane doesn't count as a bite.
+    teethOffsetX: 22,       // teeth centre this far ahead of the shark's centre (* scale)
+    teethR: 7,              // teeth kill radius (* scale) - combined with player.rx via ellipse test
     // vertical swimming (sharks weave up/down as they cross)
     waveAmpMin: 55, waveAmpMax: 165, waveFreqMin: 0.7, waveFreqMax: 1.8,
     laserChance: 0.55,           // chance a shark decides to fire when off cooldown
@@ -78,6 +79,13 @@ export const CFG = {
     stingReach: 55,               // radius of the strike hitbox at the tail tip (matches the visible glow)
     strikeUp: 44, strikeAhead: 18 // tail-tip offset relative to body during strike (up + slightly forward)
   },
+  coffin: {
+    // Cartoon coffin dropped at the death spot when a life is lost. Sinks
+    // slowly to the seabed and lingers as a visible mark, then fades out.
+    fallSpeed: 55,          // px/s downward while sinking
+    fadeStart: 3.5,         // seconds from spawn before fading begins
+    lifetime: 5.5           // seconds after spawn until the coffin is culled
+  },
   anchor: {
     // Rare falling anchor. Drops through the water from the surface at a
     // random x near the player lane. Lethal ONLY on direct body-overlap - a
@@ -105,7 +113,9 @@ export const Sim = {
     const rng = makeRng(seed);
     const W = CFG.world;
     const mode = config.mode || "party";
-    const initialLives = mode === "solo" ? CFG.player.livesSolo : CFG.player.livesParty;
+    // Lives are picked on the setup screen; default 1 (one-shot, the classic).
+    // Applies to every player - human and bots - in both solo and party.
+    const initialLives = Math.max(1, (config.lives | 0) || 1);
     const players = (config.players || []).map((p, i) => ({
       id: p.id != null ? p.id : i,
       name: p.name,
@@ -145,13 +155,16 @@ export const Sim = {
       decor,
       t: 0, frame: 0,
       status: "playing",          // "playing" | "over"
+      initialLives,                         // remembered for the HUD hearts readout
       players,
       sharks: [],
       stingrays: [],
       anchors: [],
+      coffins: [],
       nextSharkId: 1,
       nextStingrayId: 1,
       nextAnchorId: 1,
+      nextCoffinId: 1,
       spawnTimer: 0.8,            // shark spawn cadence
       raySpawnTimer: CFG.stingray.earliestT,   // first ray no earlier than earliestT
       anchorSpawnTimer: CFG.anchor.earliestT,  // first anchor no earlier than earliestT
@@ -214,7 +227,6 @@ export const Sim = {
       vx: -speed,
       bob: rng() * Math.PI * 2,
       scale,
-      rx: s.hitRX * scale, ry: s.hitRY * scale,   // hitbox grows with the art
       chomp: 0,   // >0 while jaws are open after biting
       laser: { state: "idle", timer: s.laserCooldownMin + rng() * (s.laserCooldownMax - s.laserCooldownMin) }
     });
@@ -404,6 +416,14 @@ export const Sim = {
     }
     state.stingrays = state.stingrays.filter((r) => r.x > -80);
 
+    // --- sink coffins toward the seabed, then cull once their lifetime ends ---
+    const C = CFG.coffin;
+    for (const cf of state.coffins) {
+      if (cf.y < W.waterBottom - 10) cf.y += cf.vy * dt;
+      else cf.y = W.waterBottom - 10;
+    }
+    state.coffins = state.coffins.filter((cf) => (state.t - cf.spawnT) < C.lifetime);
+
     // --- move anchors (straight-down drop) ---
     for (const a of state.anchors) {
       a.y += a.vy * dt;
@@ -472,24 +492,31 @@ export const Sim = {
       }
     }
 
-    // --- collisions (eat + laser) ---
+    // --- collisions (teeth + laser). The shark BODY is safe to touch - only
+    // a tight circle at the teeth (front of the head) kills, and only the
+    // visible laser beam kills. This matches the "kill on the dangerous part
+    // only" rule shared by all hazards. ---
     for (const p of state.players) {
       if (!p.alive) continue;
       for (const sh of state.sharks) {
-        // Only the MOUTH bites. Sharks face left, so the jaws are on the left
-        // (front) side; a swimmer only dies if they're at/ahead of where the
-        // mouth starts. Touching the back half (tail side) is harmless.
-        const mouthStart = sh.x - S.mouthStartX * sh.scale;   // world x where the jaws begin
-        if (p.x <= mouthStart) {
-          const dx = (p.x - sh.x) / (sh.rx + P.rx);
-          const dy = (p.y - sh.y) / (sh.ry + P.ry);
-          if (dx * dx + dy * dy <= 1) { sh.chomp = S.chomp; Sim._kill(state, p, "eaten", sh.x, sh.y); break; }
+        const teethX = sh.x - S.teethOffsetX * sh.scale;
+        const teethY = sh.y;
+        const tR = S.teethR * sh.scale;
+        // Circle-vs-ellipse test: teeth circle radius tR against player ellipse.
+        const dx = teethX - p.x, dy = teethY - p.y;
+        const nx = dx / P.rx, ny = dy / P.ry;
+        const d = Math.sqrt(nx * nx + ny * ny);
+        let bitten = false;
+        if (d <= 1) bitten = true;
+        else {
+          const bx = (nx / d) * P.rx, by = (ny / d) * P.ry;
+          const ex = teethX - (p.x + bx), ey = teethY - (p.y + by);
+          if (ex * ex + ey * ey <= tR * tR) bitten = true;
         }
-        // laser lane
+        if (bitten) { sh.chomp = S.chomp; Sim._kill(state, p, "eaten", teethX, teethY); break; }
+        // Laser lane - only the visible beam kills.
         if (sh.laser.state === "firing") {
           const eye = Sim._eye(sh);
-          // Only kill when the visible beam actually overlaps the fish body:
-          // beam half-thickness + the fish's body radius.
           if (p.x <= eye.x && p.x >= eye.x - S.laserRange && Math.abs(p.y - eye.y) <= S.laserBand + P.ry) {
             Sim._kill(state, p, "laser", p.x, p.y); break;
           }
@@ -504,8 +531,11 @@ export const Sim = {
   _kill(state, p, kind, x, y) {
     // I-frames after a recent respawn absorb the hit outright.
     if (p.invuln > 0) return;
-    // Solo lives: spend one and keep playing from the same spot with a brief
-    // window of invulnerability so the same hazard doesn't insta-kill again.
+    // Every life lost drops a coffin at the player's position so there's a
+    // clear visual record of where the death happened.
+    Sim._dropCoffin(state, p);
+    // Spend one life and keep playing from the same spot with a brief window
+    // of invulnerability so the same hazard doesn't insta-kill again.
     if (p.lives > 1) {
       p.lives -= 1;
       p.invuln = CFG.player.invulnDur;
@@ -518,6 +548,16 @@ export const Sim = {
     p.deathT = state.t;
     p.deathKind = kind;
     p.deathX = x; p.deathY = y;
+  },
+
+  _dropCoffin(state, p) {
+    state.coffins.push({
+      id: state.nextCoffinId++,
+      x: p.x, y: p.y,
+      vy: CFG.coffin.fallSpeed,
+      color: p.color,        // small colour flash on the lid so you can tell who died
+      spawnT: state.t
+    });
   },
 
   _resolveWinner(state) {
