@@ -34,9 +34,10 @@ export const CFG = {
   },
   shark: {
     minSpeed: 175, maxSpeed: 285,
-    // Sharks are now sparser: octopuses and lionfish share the hazard budget
-    // so the ocean doesn't become a shark-only wall.
-    spawnStart: 3.5,   // seconds between spawns at t=0
+    // Sharks are sparser AND arrive later than the other hazards - stingrays,
+    // octopuses, and lionfish have the early game to themselves.
+    earliestT: 6,      // no sharks until this many seconds in
+    spawnStart: 3.5,   // seconds between spawns once the earliestT gate opens
     spawnMin: 0.55,    // fastest spawn interval late-game
     rampTime: 26,      // seconds to reach peak difficulty (steep, front-loaded)
     rampEase: 0.6,     // <1 front-loads the ramp so it gets hard fast
@@ -69,7 +70,7 @@ export const CFG = {
     // with a wavy motion and stings with a telegraphed tail whip. Rays have
     // their own spawn timer (not tied to sharks) so they arrive on a steady
     // cadence with a bit of jitter, and never more than a couple at once.
-    earliestT: 5,                 // no rays until this many seconds in (early game is pure sharks)
+    earliestT: 1,                 // first ray shortly after round start (before sharks)
     spawnMin: 4.5, spawnMax: 7.0, // seconds between ray spawns (base cadence + randomness)
     maxOnScreen: 2,               // cap - keeps things from piling up
     minSpeed: 90, maxSpeed: 140,  // slower than sharks (175-285) but clearly moving, not stationary
@@ -93,36 +94,46 @@ export const CFG = {
     lifetime: 2.5           // seconds after spawn until the coffin is culled
   },
   octopus: {
-    // Blue-ringed octopus: hovers mid-water with 8 wavy tentacles. Only the
-    // small blue-ring circles at the tentacle TIPS kill - the mantle body is
-    // safe to touch. Slow drifter; a steady lurking hazard rather than a
-    // fast threat like the sharks.
-    earliestT: 14,
-    spawnMin: 10, spawnMax: 16,
+    // Blue-ringed octopus: bulbous mantle at top with 8 tentacles hanging
+    // DOWN in a fan. Only the small blue-ring circles at the tentacle tips
+    // (at the bottom) kill; the mantle body is safe to touch. Slow drifter,
+    // hovers mid-water.
+    earliestT: 1,                          // appears from t=1s (before sharks)
+    spawnMin: 8, spawnMax: 14,
     maxOnScreen: 2,
-    minSpeed: 22, maxSpeed: 42,           // slow leftward drift
-    minY: 200, maxY: 560,                  // mid-water; avoids the seabed floor
+    minSpeed: 22, maxSpeed: 42,            // slow leftward drift
+    minY: 200, maxY: 500,                  // hovers mid-water (leaves tentacle room below)
     scaleMin: 1.05, scaleMax: 1.3,
-    bodyR: 18,                             // mantle radius (cosmetic)
-    tentacleLen: 40,                       // distance from centre to tip
+    bodyR: 22,                             // mantle radius (chunky)
+    tentacleLen: 52,                       // vertical reach of the tentacle tips
     tentacles: 8,
-    tipR: 12,                              // kill radius of each blue-ring stinger
-    swayAmp: 0.15                          // radians of tentacle sway per cycle
+    tipR: 11,                              // kill radius of each blue-ring stinger
+    // Tentacles fan out in the DOWNWARD half circle: angle in [spreadMin, spreadMax]
+    // where 0 = +X (right), pi/2 = +Y (down), pi = -X (left).
+    spreadMin: Math.PI * 0.18,             // lower-right
+    spreadMax: Math.PI * 0.82,             // lower-left
+    swayAmp: 0.14
   },
   lionfish: {
-    // Lionfish: hovers with a fan of long venomous spikes. Only the small
-    // hazard tips at the end of each spike kill - the body is safe to touch.
-    earliestT: 18,
-    spawnMin: 11, spawnMax: 19,
+    // Lionfish: horizontal striped body with a fan of DORSAL SPIKES rising
+    // from the top of the body. Only the small yellow hazard tips at the
+    // top of each spike kill; the body is safe.
+    earliestT: 3,                          // appears from t=3s (still before sharks)
+    spawnMin: 9, spawnMax: 15,
     maxOnScreen: 2,
     minSpeed: 30, maxSpeed: 55,
     minY: 180, maxY: 560,
     scaleMin: 1.0, scaleMax: 1.35,
-    bodyRX: 20, bodyRY: 10,               // body ellipse (cosmetic)
-    spikes: 9,                             // radiating fin rays
-    spikeLen: 32,                          // length from body edge to tip
-    tipR: 8,                               // kill radius of each spike-tip hazard
-    swayAmp: 0.08
+    bodyRX: 22, bodyRY: 11,                // body ellipse (cosmetic)
+    spikes: 7,                             // dorsal fin rays fanning up
+    spikeLen: 34,                          // vertical reach of the spike tips above the body
+    tipR: 8,                               // kill radius of each spike-top hazard
+    // Spikes rise from the top of the body along its length. rootSpread is
+    // the horizontal span (as a fraction of bodyRX) they cover.
+    rootSpread: 1.4,
+    // Slight outward lean of the outermost spikes (radians).
+    tiltAmp: 0.35,
+    swayAmp: 0.06
   },
   anchor: {
     // Rare falling anchor, preceded by a boat visibly crossing the water
@@ -137,10 +148,11 @@ export const CFG = {
     scaleMin: 1.8, scaleMax: 2.2  // bigger, more menacing anchor
   },
   boat: {
-    // Simple hull that crosses the top of the water and releases an anchor at
-    // its targetX. Purely a visual telegraph for the anchor spawn.
-    speed: 55,                    // px/s leftward drift
-    hullW: 90, hullH: 22          // sprite footprint, drawn straddling waterTop
+    // A big hull crosses the top of the water and releases an anchor at its
+    // targetX - the vessel is deliberately large so it reads as "an actual
+    // boat" whose anchor makes sense.
+    speed: 45,                    // px/s leftward drift (slower - it's a big ship)
+    hullW: 200, hullH: 44         // sprite footprint, drawn straddling waterTop
   },
   // Gentle, shared speed-up applied to BOTH shark travel speed and player
   // vertical agility, so the tempo rises but dodging stays just as feasible.
@@ -164,15 +176,18 @@ export const CFG = {
 export const DIFFICULTIES = {
   easy: {
     label: "Easy",
+    // Sharks are delayed further and pace stays low; other hazards still
+    // arrive first so the round starts with the calmer creatures.
     shark: {
+      earliestT: 12,
       spawnStart: 4.5, spawnMin: 0.9,
       rampTime: 36, rampEase: 0.75,
       laserChance: 0.38, laserCooldownMin: 1.8, laserCooldownMax: 4.0,
       sizeStepPerTier: 0.13, tierSeconds: 20, scaleCap: 3.0
     },
-    stingray: { earliestT: 10, spawnMin: 8, spawnMax: 13, maxOnScreen: 1 },
-    octopus:  { earliestT: 18, spawnMin: 14, spawnMax: 22, maxOnScreen: 1 },
-    lionfish: { earliestT: 22, spawnMin: 16, spawnMax: 26, maxOnScreen: 1 },
+    stingray: { earliestT: 2, spawnMin: 8, spawnMax: 13, maxOnScreen: 1 },
+    octopus:  { earliestT: 3, spawnMin: 12, spawnMax: 18, maxOnScreen: 1 },
+    lionfish: { earliestT: 5, spawnMin: 14, spawnMax: 22, maxOnScreen: 1 },
     anchor:   { earliestT: 20, spawnMin: 14, spawnMax: 24 },
     progression: { speedPerSec: 0.013, speedMax: 2.0 }
   },
@@ -182,16 +197,19 @@ export const DIFFICULTIES = {
   },
   fiendish: {
     label: "Fiendish",
+    // Sharks arrive sooner and heavier; other hazards still lead the round
+    // by a couple of seconds.
     shark: {
+      earliestT: 3,
       spawnStart: 2.2, spawnMin: 0.32,
       rampTime: 18, rampEase: 0.5,
       laserChance: 0.75, laserCooldownMin: 0.8, laserCooldownMax: 2.0,
       sizeStepPerTier: 0.22, tierSeconds: 10, scaleCap: 3.8
     },
-    stingray: { earliestT: 3, spawnMin: 3.0, spawnMax: 5.0, maxOnScreen: 3 },
-    octopus:  { earliestT: 6, spawnMin: 6, spawnMax: 10, maxOnScreen: 3 },
-    lionfish: { earliestT: 8, spawnMin: 6.5, spawnMax: 11, maxOnScreen: 3 },
-    anchor:   { earliestT: 8,  spawnMin: 5,  spawnMax: 11 },
+    stingray: { earliestT: 0.5, spawnMin: 3.0, spawnMax: 5.0, maxOnScreen: 3 },
+    octopus:  { earliestT: 1,   spawnMin: 6, spawnMax: 10, maxOnScreen: 3 },
+    lionfish: { earliestT: 1.5, spawnMin: 6.5, spawnMax: 11, maxOnScreen: 3 },
+    anchor:   { earliestT: 8,   spawnMin: 5, spawnMax: 11 },
     progression: { speedPerSec: 0.028, speedMax: 3.0 }
   }
 };
@@ -282,7 +300,7 @@ export const Sim = {
       nextBoatId: 1,
       nextAnchorId: 1,
       nextCoffinId: 1,
-      spawnTimer: 0.8,                             // shark spawn cadence
+      spawnTimer: 0.5,                             // starts ticking once t >= shark.earliestT
       raySpawnTimer:      diff.stingray.earliestT, // first ray no earlier than earliestT
       octopusSpawnTimer:  diff.octopus.earliestT,  // first octopus no earlier than earliestT
       lionfishSpawnTimer: diff.lionfish.earliestT, // first lionfish no earlier than earliestT
@@ -437,24 +455,53 @@ export const Sim = {
     });
   },
 
-  // Blue-ring stinger position at tentacle i. Used by both collision and
-  // renderer so they can't drift out of sync.
+  // Blue-ring stinger position at tentacle i. Tentacles hang DOWN from the
+  // octopus mantle in a fan (angles in the downward hemisphere). Used by both
+  // collision and the renderer so they can't drift out of sync.
   _octopusTip(o, i) {
     const O = CFG.octopus;
-    const angle = (i / O.tentacles) * Math.PI * 2
-                + Math.sin(o.swimT * 1.6 + i * 0.7 + o.wavePhase) * O.swayAmp;
+    const t = O.tentacles > 1 ? i / (O.tentacles - 1) : 0.5;
+    const base = O.spreadMin + t * (O.spreadMax - O.spreadMin);
+    const angle = base + Math.sin(o.swimT * 1.6 + i * 0.7 + o.wavePhase) * O.swayAmp;
     const len = O.tentacleLen * o.scale;
     return { x: o.x + Math.cos(angle) * len, y: o.y + Math.sin(angle) * len };
   },
 
-  // Hazard-tip position at lionfish spike i. Spikes fan out radially with a
-  // subtle sway; the tip is where the venom "hazard" lives.
+  // Root position (on the body edge) of octopus tentacle i - shared by
+  // collision-adjacent maths and rendering.
+  _octopusRoot(o, i) {
+    const O = CFG.octopus;
+    const t = O.tentacles > 1 ? i / (O.tentacles - 1) : 0.5;
+    // Roots sit along the bottom edge of the mantle, spread horizontally.
+    const spread = O.bodyR * 0.75 * o.scale;
+    const rootX = ((t - 0.5) * 2) * spread;
+    const rootY = O.bodyR * 0.55 * o.scale;
+    return { x: o.x + rootX, y: o.y + rootY };
+  },
+
+  // Hazard-tip position at lionfish dorsal spike i. Spikes rise UP from the
+  // top of the body, spread along its length with a slight outward lean.
   _lionfishTip(l, i) {
     const L = CFG.lionfish;
-    const angle = (i / L.spikes) * Math.PI * 2
-                + Math.sin(l.swimT * 1.2 + i * 0.5 + l.wavePhase) * L.swayAmp;
-    const len = (L.bodyRX + L.spikeLen) * l.scale;
-    return { x: l.x + Math.cos(angle) * len, y: l.y + Math.sin(angle) * len };
+    const root = Sim._lionfishSpikeRoot(l, i);
+    const t = L.spikes > 1 ? i / (L.spikes - 1) : 0.5;
+    // Slight outward tilt: leftmost spike leans left, rightmost leans right.
+    const tilt = (t - 0.5) * 2 * L.tiltAmp;
+    const angle = -Math.PI / 2 + tilt
+                + Math.sin(l.swimT * 1.4 + i * 0.5 + l.wavePhase) * L.swayAmp;
+    const len = L.spikeLen * l.scale;
+    return { x: root.x + Math.cos(angle) * len, y: root.y + Math.sin(angle) * len };
+  },
+
+  // Root of a lionfish spike (a point along the top edge of the body).
+  _lionfishSpikeRoot(l, i) {
+    const L = CFG.lionfish;
+    const t = L.spikes > 1 ? i / (L.spikes - 1) : 0.5;
+    // Roots span rootSpread * bodyRX horizontally along the top of the body.
+    const halfSpan = (L.bodyRX * L.rootSpread * 0.5) * l.scale;
+    const rootX = (t - 0.5) * 2 * halfSpan;
+    const rootY = -L.bodyRY * l.scale;
+    return { x: l.x + rootX, y: l.y + rootY };
   },
 
   _spawnAnchor(state, x, y) {
@@ -550,11 +597,13 @@ export const Sim = {
     state.frame++;
     const m = Sim._speedMul(state, state.t);   // shared tempo: players get faster with the sharks
 
-    // --- spawn sharks (dominant hazard; cadence set by difficulty) ---
-    state.spawnTimer -= dt;
-    if (state.spawnTimer <= 0) {
-      Sim._spawnShark(state);
-      state.spawnTimer += Sim._spawnInterval(state, state.t);
+    // --- spawn sharks (gated by earliestT so early game is other hazards) ---
+    if (state.t >= S.earliestT) {
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0) {
+        Sim._spawnShark(state);
+        state.spawnTimer += Sim._spawnInterval(state, state.t);
+      }
     }
 
     // --- spawn stingrays on their own steady-with-jitter timer ---

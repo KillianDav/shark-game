@@ -83,8 +83,8 @@
       "seed": 0.145913
     }
   ],
-  "t": 15.8,
-  "frame": 948,
+  "t": 22.033333,
+  "frame": 1322,
   "status": "over",
   "initialLives": 1,
   "players": [
@@ -94,15 +94,15 @@
       "color": "#ffd23f",
       "isBot": false,
       "x": 250,
-      "y": 187.214519,
-      "vy": 359.7,
+      "y": 158.647167,
+      "vy": 264.367778,
       "alive": false,
       "lives": 0,
       "invuln": 0,
-      "deathT": 9.95,
-      "deathKind": "laser",
-      "deathX": 250,
-      "deathY": 187.214519,
+      "deathT": 11.866667,
+      "deathKind": "eaten",
+      "deathX": 264.563991,
+      "deathY": 179.9634,
       "botBias": 0.287837,
       "botReact": 0.603376
     },
@@ -112,15 +112,15 @@
       "color": "#ff6b6b",
       "isBot": true,
       "x": 266,
-      "y": 685,
-      "vy": 0,
+      "y": 358.43984,
+      "vy": -386.92845,
       "alive": false,
       "lives": 0,
       "invuln": 0,
-      "deathT": 15.8,
-      "deathKind": "eaten",
-      "deathX": 271.299512,
-      "deathY": 659.981216,
+      "deathT": 15.883333,
+      "deathKind": "laser",
+      "deathX": 266,
+      "deathY": 358.43984,
       "botBias": -0.009477,
       "botReact": 0.858967
     },
@@ -135,10 +135,10 @@
       "alive": false,
       "lives": 0,
       "invuln": 0,
-      "deathT": 15.766667,
-      "deathKind": "eaten",
-      "deathX": 281.518493,
-      "deathY": 658.604308,
+      "deathT": 22.033333,
+      "deathKind": "laser",
+      "deathX": 282,
+      "deathY": 685,
       "botBias": 0.005657,
       "botReact": 0.623736
     },
@@ -150,160 +150,187 @@
       "x": 298,
       "y": 685,
       "vy": 0,
-      "alive": true,
-      "lives": 1,
+      "alive": false,
+      "lives": 0,
       "invuln": 0,
-      "deathT": null,
-      "deathKind": null,
-      "deathX": 0,
-      "deathY": 0,
+      "deathT": 22.033333,
+      "deathKind": "laser",
+      "deathX": 298,
+      "deathY": 685,
       "botBias": -0.255745,
       "botReact": 0.833198
     }
   ],
   "sharks": [
     {
-      "id": 5,
-      "x": 227.355817,
-      "y": 227.412637,
-      "baseY": 185.675195,
-      "swimT": 15.029655,
-      "waveAmp": 57.020531,
-      "waveFreq": 1.424412,
-      "wavePhase": 6.044695,
-      "vx": -216.748867,
-      "bob": 31.426392,
-      "scale": 1.847051,
-      "chomp": 0,
-      "laser": {
-        "state": "idle",
-        "timer": 1.636277
-      }
-    },
-    {
-      "id": 6,
-      "x": 307.882883,
-      "y": 659.981216,
-      "baseY": 608.457954,
-      "swimT": 9.223352,
-      "waveAmp": 64.152091,
-      "waveFreq": 1.055918,
-      "wavePhase": 3.759818,
-      "vx": -306.569441,
-      "bob": 26.256859,
-      "scale": 1.662881,
-      "chomp": 0.42,
-      "laser": {
-        "state": "idle",
-        "timer": 2.211029
-      }
-    },
-    {
-      "id": 7,
-      "x": 708.733585,
-      "y": 490.785635,
-      "baseY": 386.023734,
-      "swimT": 10.40746,
-      "waveAmp": 107.140994,
-      "waveFreq": 1.411101,
-      "wavePhase": 5.523242,
-      "vx": -357.320612,
-      "bob": 16.595533,
-      "scale": 1.890611,
-      "chomp": 0,
-      "laser": {
-        "state": "idle",
-        "timer": 0.21501
-      }
-    },
-    {
       "id": 8,
-      "x": 1248.78351,
-      "y": 581.320731,
-      "baseY": 558.18548,
-      "swimT": 5.460837,
-      "waveAmp": 129.497819,
-      "waveFreq": 1.439981,
-      "wavePhase": 1.38166,
-      "vx": -304.054967,
-      "bob": 2.953193,
-      "scale": 1.963274,
+      "x": 149.558008,
+      "y": 137.166129,
+      "baseY": 0.477154,
+      "swimT": 11.897444,
+      "waveAmp": 136.815228,
+      "waveFreq": 1.114369,
+      "wavePhase": 0.921986,
+      "vx": -300.111427,
+      "bob": 24.754324,
+      "scale": 1.786453,
       "chomp": 0,
       "laser": {
         "state": "idle",
-        "timer": 1.712291
+        "timer": 0.932609,
+        "y": 120
+      }
+    },
+    {
+      "id": 9,
+      "x": 416.882162,
+      "y": 155.514602,
+      "baseY": 72.295284,
+      "swimT": 2.975174,
+      "waveAmp": 143.060706,
+      "waveFreq": 1.099217,
+      "wavePhase": 3.63365,
+      "vx": -325.806296,
+      "bob": 21.633498,
+      "scale": 2.017367,
+      "chomp": 0,
+      "laser": {
+        "state": "idle",
+        "timer": 1.856134,
+        "y": 120
+      }
+    },
+    {
+      "id": 10,
+      "x": 771.837866,
+      "y": 678,
+      "baseY": 625.283211,
+      "swimT": 7.39683,
+      "waveAmp": 71.383522,
+      "waveFreq": 1.738594,
+      "wavePhase": 1.4683,
+      "vx": -315.64563,
+      "bob": 13.556516,
+      "scale": 1.876058,
+      "chomp": 0,
+      "laser": {
+        "state": "firing",
+        "timer": 0.5,
+        "y": 678
+      }
+    },
+    {
+      "id": 11,
+      "x": 1118.268872,
+      "y": 678,
+      "baseY": 668.824072,
+      "swimT": 5.568851,
+      "waveAmp": 161.943711,
+      "waveFreq": 1.550681,
+      "wavePhase": 4.244776,
+      "vx": -266.077354,
+      "bob": 6.305733,
+      "scale": 1.813842,
+      "chomp": 0,
+      "laser": {
+        "state": "idle",
+        "timer": 1.772976
       }
     }
   ],
   "stingrays": [
     {
-      "id": 1,
-      "x": 571.674392,
-      "y": 585.844748,
-      "baseY": 606.43235,
-      "swimT": 8.38332,
-      "waveAmp": 31.384512,
-      "waveFreq": 0.484036,
-      "wavePhase": 6.082433,
-      "vx": -132.469932,
-      "scale": 1.485783,
-      "sting": {
-        "state": "active",
-        "timer": 0.22,
-        "x": 598.418478,
-        "y": 520.470314
-      }
-    },
-    {
-      "id": 2,
-      "x": 1192.645997,
-      "y": 615.340025,
-      "baseY": 596.375778,
-      "swimT": 3.475476,
-      "waveAmp": 26.612129,
-      "waveFreq": 0.350462,
-      "wavePhase": 1.130351,
-      "vx": -170.023849,
-      "scale": 1.246926,
+      "id": 3,
+      "x": 532.154113,
+      "y": 657.981132,
+      "baseY": 662.591655,
+      "swimT": 10.696059,
+      "waveAmp": 29.405412,
+      "waveFreq": 0.498802,
+      "wavePhase": 0.790526,
+      "vx": -130.648931,
+      "scale": 1.447956,
       "sting": {
         "state": "idle",
-        "timer": 1.821081,
-        "x": 0,
-        "y": 0
+        "timer": 2.841857,
+        "x": 575.637175,
+        "y": 592.351215
       }
     }
   ],
-  "octopuses": [],
-  "lionfish": [],
+  "octopuses": [
+    {
+      "id": 1,
+      "x": 545.425686,
+      "y": 202.214088,
+      "baseY": 200.244756,
+      "vx": -38.836635,
+      "swimT": 25.959031,
+      "wavePhase": 0.975201,
+      "scale": 1.124886
+    },
+    {
+      "id": 2,
+      "x": 888.562351,
+      "y": 426.453161,
+      "baseY": 430.674905,
+      "vx": -48.516273,
+      "swimT": 12.90863,
+      "wavePhase": 5.936971,
+      "scale": 1.256119
+    }
+  ],
+  "lionfish": [
+    {
+      "id": 1,
+      "x": 418.60101,
+      "y": 262.778691,
+      "baseY": 268.384305,
+      "vx": -56.785477,
+      "swimT": 23.704653,
+      "wavePhase": 1.863164,
+      "scale": 1.320977
+    },
+    {
+      "id": 2,
+      "x": 1218.306437,
+      "y": 213.790892,
+      "baseY": 208.284855,
+      "vx": -44.286483,
+      "swimT": 9.626767,
+      "wavePhase": 5.881689,
+      "scale": 1.21856
+    }
+  ],
   "boats": [],
   "anchors": [],
   "coffins": [
     {
-      "id": 2,
+      "id": 3,
       "x": 282,
       "y": 685,
       "color": "#4ecdc4",
-      "spawnT": 15.766667
+      "spawnT": 22.033333
     },
     {
-      "id": 3,
-      "x": 266,
+      "id": 4,
+      "x": 298,
       "y": 685,
-      "color": "#ff6b6b",
-      "spawnT": 15.8
+      "color": "#c084fc",
+      "spawnT": 22.033333
     }
   ],
-  "nextSharkId": 9,
-  "nextStingrayId": 3,
-  "nextOctopusId": 1,
-  "nextLionfishId": 1,
+  "nextSharkId": 12,
+  "nextStingrayId": 4,
+  "nextOctopusId": 3,
+  "nextLionfishId": 3,
   "nextBoatId": 1,
   "nextAnchorId": 1,
-  "nextCoffinId": 4,
-  "spawnTimer": 1.039043,
-  "raySpawnTimer": 3.665277,
-  "octopusSpawnTimer": 12.183333,
-  "lionfishSpawnTimer": 18,
-  "anchorSpawnTimer": 8.183333,
-  "winnerId": 3
+  "nextCoffinId": 5,
+  "spawnTimer": 0.058913,
+  "raySpawnTimer": 0.536354,
+  "octopusSpawnTimer": 4.151142,
+  "lionfishSpawnTimer": 6.596515,
+  "anchorSpawnTimer": 1.95,
+  "winnerId": 2
 }

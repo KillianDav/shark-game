@@ -318,90 +318,88 @@ export const Render = {
     const bodyR = O.bodyR * s;
     const tipR = O.tipR;   // rendered at world scale so the kill circle matches the visible ring
 
-    ctx.save();
-    ctx.translate(o.x, o.y);
-
-    // Tentacles: each is a bezier curve from just inside the body to the tip.
-    // The tip position uses Sim._octopusTip so collision and art stay in sync.
-    ctx.strokeStyle = "#5a1c3e";
-    ctx.lineWidth = 3.5 * s;
+    // Tentacles: drawn in world coords so the top of each curve attaches to
+    // a spread point along the bottom of the mantle and the tip lands where
+    // `Sim._octopusTip` says it does.
     ctx.lineCap = "round";
     for (let i = 0; i < O.tentacles; i++) {
+      const root = Sim._octopusRoot(o, i);
       const tip = Sim._octopusTip(o, i);
-      const tx = tip.x - o.x, ty = tip.y - o.y;
-      // Root just outside the body at the same angle
-      const ang = Math.atan2(ty, tx);
-      const rx = Math.cos(ang) * bodyR * 0.55;
-      const ry = Math.sin(ang) * bodyR * 0.55;
-      // Curve control offset perpendicular to the tentacle for a lazy S-shape
-      const perpX = -Math.sin(ang), perpY = Math.cos(ang);
-      const wave = Math.sin(o.swimT * 2.4 + i * 0.9 + o.wavePhase) * 6 * s;
-      const cx1 = (rx + tx) * 0.5 + perpX * wave;
-      const cy1 = (ry + ty) * 0.5 + perpY * wave;
+      // A control point pushed out perpendicular to the (root -> tip) line
+      // gives each tentacle a lazy S-shape / curl.
+      const dx = tip.x - root.x, dy = tip.y - root.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const perpX = -dy / len, perpY = dx / len;
+      const curl = Math.sin(o.swimT * 1.9 + i * 0.9 + o.wavePhase) * 10 * s;
+      // Give outer tentacles a stronger curl than the central ones.
+      const t = O.tentacles > 1 ? i / (O.tentacles - 1) : 0.5;
+      const outerBias = (t - 0.5) * 2 * 6 * s;
+      const cx = (root.x + tip.x) * 0.5 + perpX * (curl + outerBias);
+      const cy = (root.y + tip.y) * 0.5 + perpY * (curl + outerBias);
+      // Outer stroke (darker)
+      ctx.strokeStyle = "#3a1128"; ctx.lineWidth = 4.5 * s;
       ctx.beginPath();
-      ctx.moveTo(rx, ry);
-      ctx.quadraticCurveTo(cx1, cy1, tx, ty);
+      ctx.moveTo(root.x, root.y);
+      ctx.quadraticCurveTo(cx, cy, tip.x, tip.y);
       ctx.stroke();
-    }
-    // Inner lighter tentacle stripe for a bit of depth
-    ctx.strokeStyle = "#7a2e5c";
-    ctx.lineWidth = 1.8 * s;
-    for (let i = 0; i < O.tentacles; i++) {
-      const tip = Sim._octopusTip(o, i);
-      const tx = tip.x - o.x, ty = tip.y - o.y;
-      const ang = Math.atan2(ty, tx);
-      const rx = Math.cos(ang) * bodyR * 0.55;
-      const ry = Math.sin(ang) * bodyR * 0.55;
-      const perpX = -Math.sin(ang), perpY = Math.cos(ang);
-      const wave = Math.sin(o.swimT * 2.4 + i * 0.9 + o.wavePhase) * 6 * s;
-      const cx1 = (rx + tx) * 0.5 + perpX * wave;
-      const cy1 = (ry + ty) * 0.5 + perpY * wave;
+      // Inner stroke (lighter for depth)
+      ctx.strokeStyle = "#6c2450"; ctx.lineWidth = 2.4 * s;
       ctx.beginPath();
-      ctx.moveTo(rx, ry);
-      ctx.quadraticCurveTo(cx1, cy1, tx, ty);
+      ctx.moveTo(root.x, root.y);
+      ctx.quadraticCurveTo(cx, cy, tip.x, tip.y);
       ctx.stroke();
     }
 
-    // Mantle (bulbous body) - purple/burgundy with a highlight.
+    // Mantle: bulbous head-body sitting ABOVE the tentacle roots.
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    // Slight upward bulge shape (rounded on top, gently rounded underneath).
     ctx.fillStyle = "#5a1c3e";
-    ctx.beginPath(); ctx.ellipse(0, -2, bodyR, bodyR * 0.95, 0, 0, 7); ctx.fill();
-    ctx.strokeStyle = "#3a0f28"; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.fillStyle = "#7a2e5c";
-    ctx.beginPath(); ctx.ellipse(-2, -6, bodyR * 0.6, bodyR * 0.35, 0, 0, 7); ctx.fill();
-
-    // Blue ring pattern on the mantle (mimics the real animal)
-    ctx.fillStyle = "#3af0ff";
+    ctx.beginPath();
+    ctx.ellipse(0, -bodyR * 0.15, bodyR, bodyR * 1.1, 0, 0, 7);
+    ctx.fill();
+    ctx.strokeStyle = "#3a0f28"; ctx.lineWidth = 1.3; ctx.stroke();
+    // Top highlight for a shiny bulb feel
+    ctx.fillStyle = "#8a3768";
+    ctx.beginPath();
+    ctx.ellipse(-bodyR * 0.15, -bodyR * 0.65, bodyR * 0.55, bodyR * 0.28, -0.2, 0, 7);
+    ctx.fill();
+    // A few faint blue rings on the mantle for real-world flavour (not the
+    // stingers - those are only at the tentacle tips).
     ctx.strokeStyle = "#0a3d8a"; ctx.lineWidth = 1;
-    for (let i = 0; i < 4; i++) {
-      const ang = i * 1.4 + o.wavePhase;
-      const rr = bodyR * 0.55;
-      const bx = Math.cos(ang) * rr * 0.7;
-      const by = Math.sin(ang) * rr * 0.7 - 2;
-      ctx.beginPath(); ctx.arc(bx, by, 2.2 * s, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#3af0ff";
+    const mantleRings = [
+      { x: -bodyR * 0.35, y: -bodyR * 0.15, r: 1.6 },
+      { x:  bodyR * 0.30, y: -bodyR * 0.35, r: 1.4 },
+      { x:  bodyR * 0.05, y: -bodyR * 0.05, r: 1.7 },
+      { x: -bodyR * 0.10, y: -bodyR * 0.55, r: 1.3 }
+    ];
+    for (const r of mantleRings) {
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r * s, 0, 7); ctx.fill(); ctx.stroke();
     }
 
-    // Eyes
+    // Eyes on the front-top of the mantle.
     ctx.fillStyle = "#fff8e0";
-    ctx.beginPath(); ctx.ellipse(-4, -3, 2.2, 1.6, 0, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(4, -3, 2.2, 1.6, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-bodyR * 0.32, -bodyR * 0.22, 2.6, 2.0, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( bodyR * 0.32, -bodyR * 0.22, 2.6, 2.0, 0, 0, 7); ctx.fill();
     ctx.fillStyle = "#0d141a";
-    ctx.beginPath(); ctx.arc(-4, -3, 1, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(4, -3, 1, 0, 7); ctx.fill();
-
+    ctx.beginPath(); ctx.arc(-bodyR * 0.32, -bodyR * 0.22, 1.2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc( bodyR * 0.32, -bodyR * 0.22, 1.2, 0, 7); ctx.fill();
     ctx.restore();
 
-    // Blue-ring stingers at each tentacle tip - drawn last, in world coords,
-    // so the glow overlays the tentacle end. The circle IS the kill zone.
+    // Blue-ring stingers at each tentacle TIP (in world coords, drawn last so
+    // they sit on top). Circle IS the kill zone.
     for (let i = 0; i < O.tentacles; i++) {
       const tip = Sim._octopusTip(o, i);
-      // Soft glow halo
-      ctx.fillStyle = "rgba(58,240,255,0.35)";
+      // Soft glow halo matching the kill radius
+      ctx.fillStyle = "rgba(58,240,255,0.32)";
       ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR, 0, 7); ctx.fill();
-      // Blue ring
+      // Ring
       ctx.strokeStyle = "#0a3d8a"; ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR * 0.55, 0, 7); ctx.stroke();
+      // Bright inner dot
       ctx.fillStyle = "#3af0ff";
-      ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR * 0.35, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR * 0.32, 0, 7); ctx.fill();
     }
   },
 
@@ -412,72 +410,106 @@ export const Render = {
     const bodyRY = L.bodyRY * s;
     const tipR = L.tipR;
 
-    ctx.save();
-    ctx.translate(f.x, f.y);
-
-    // Spikes: long thin rays fanning out radially. Same tip helper as
-    // collision so what you see IS what kills.
-    ctx.strokeStyle = "#4a1a10";
-    ctx.lineWidth = 1.8 * s;
+    // Dorsal spikes drawn FIRST (behind the body) so the body overlaps their
+    // base cleanly. Each spike is a thin line from its root on the body-top
+    // up to the tip that Sim._lionfishTip returns.
     ctx.lineCap = "round";
     for (let i = 0; i < L.spikes; i++) {
+      const root = Sim._lionfishSpikeRoot(f, i);
       const tip = Sim._lionfishTip(f, i);
-      const tx = tip.x - f.x, ty = tip.y - f.y;
-      const ang = Math.atan2(ty, tx);
-      const rx = Math.cos(ang) * bodyRX * 0.9;
-      const ry = Math.sin(ang) * bodyRY * 0.9;
-      ctx.beginPath();
-      ctx.moveTo(rx, ry);
-      ctx.lineTo(tx, ty);
-      ctx.stroke();
+      // Outer dark stroke
+      ctx.strokeStyle = "#2f1810"; ctx.lineWidth = 2.4 * s;
+      ctx.beginPath(); ctx.moveTo(root.x, root.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
+      // Inner warm colour so the spike reads as ridged
+      ctx.strokeStyle = "#c74a2a"; ctx.lineWidth = 1.1 * s;
+      ctx.beginPath(); ctx.moveTo(root.x, root.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
     }
-    // Translucent fin membrane between adjacent spikes for a fan look
-    ctx.fillStyle = "rgba(212,64,42,0.28)";
+    // Translucent dorsal fin membrane connecting adjacent spike tips - only
+    // above the body, so it reads as a proper dorsal fin (not a full-body halo).
+    ctx.fillStyle = "rgba(212,64,42,0.25)";
     ctx.beginPath();
     for (let i = 0; i < L.spikes; i++) {
       const tip = Sim._lionfishTip(f, i);
-      const tx = tip.x - f.x, ty = tip.y - f.y;
-      if (i === 0) ctx.moveTo(tx * 0.85, ty * 0.85);
-      else ctx.lineTo(tx * 0.85, ty * 0.85);
+      if (i === 0) ctx.moveTo(tip.x, tip.y);
+      else ctx.lineTo(tip.x, tip.y);
+    }
+    // Close along the body top from right root to left root.
+    for (let i = L.spikes - 1; i >= 0; i--) {
+      const root = Sim._lionfishSpikeRoot(f, i);
+      ctx.lineTo(root.x, root.y);
     }
     ctx.closePath(); ctx.fill();
 
-    // Body: horizontal ellipse with red/white cartoon bands.
-    ctx.fillStyle = "#f0e8d8";
-    ctx.beginPath(); ctx.ellipse(0, 0, bodyRX, bodyRY, 0, 0, 7); ctx.fill();
-    ctx.strokeStyle = "#2f1810"; ctx.lineWidth = 1; ctx.stroke();
-    // Warning stripes
-    ctx.fillStyle = "#d4402a";
-    for (const bx of [-bodyRX * 0.55, -bodyRX * 0.15, bodyRX * 0.3]) {
-      ctx.save();
-      ctx.beginPath(); ctx.ellipse(0, 0, bodyRX, bodyRY, 0, 0, 7); ctx.clip();
-      ctx.fillRect(bx - 2 * s, -bodyRY - 1, 4 * s, bodyRY * 2 + 2);
-      ctx.restore();
-    }
+    // Body (facing right toward the divers).
+    ctx.save();
+    ctx.translate(f.x, f.y);
 
-    // Head - a small skin-tone patch at the front (right, since it faces the
-    // players' lane); eye + tiny mouth for cartoon face.
-    ctx.fillStyle = "#e4b090";
-    ctx.beginPath(); ctx.arc(bodyRX * 0.72, -1, bodyRY * 0.55, 0, 7); ctx.fill();
+    // Slight tail fin at the back-left
+    ctx.fillStyle = "#c74a2a";
+    ctx.beginPath();
+    ctx.moveTo(-bodyRX, 0);
+    ctx.lineTo(-bodyRX * 1.6, -bodyRY * 0.9);
+    ctx.lineTo(-bodyRX * 1.5, 0);
+    ctx.lineTo(-bodyRX * 1.6, bodyRY * 0.9);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#2f1810"; ctx.lineWidth = 1; ctx.stroke();
+
+    // Pectoral fin on the side (feathered look)
+    ctx.fillStyle = "rgba(212,64,42,0.55)";
+    ctx.beginPath();
+    ctx.moveTo(-bodyRX * 0.1, bodyRY * 0.4);
+    ctx.quadraticCurveTo(bodyRX * 0.1, bodyRY * 1.4, -bodyRX * 0.5, bodyRY * 1.1);
+    ctx.closePath(); ctx.fill();
+
+    // Body ellipse - cream base with warning stripes.
+    ctx.fillStyle = "#f0e6d0";
+    ctx.beginPath(); ctx.ellipse(0, 0, bodyRX, bodyRY, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#2f1810"; ctx.lineWidth = 1.1; ctx.stroke();
+    // Warning stripes (clipped to body)
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(0, 0, bodyRX, bodyRY, 0, 0, 7); ctx.clip();
+    ctx.fillStyle = "#c74a2a";
+    for (const bx of [-bodyRX * 0.6, -bodyRX * 0.2, bodyRX * 0.25]) {
+      ctx.fillRect(bx - 2.5 * s, -bodyRY - 1, 5 * s, bodyRY * 2 + 2);
+    }
+    ctx.restore();
+
+    // Head - just the front third of the body highlighted, with eye + mouth.
+    ctx.fillStyle = "#f6cea0";
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(0, 0, bodyRX, bodyRY, 0, 0, 7); ctx.clip();
+    ctx.beginPath(); ctx.arc(bodyRX * 0.7, 0, bodyRY * 1.2, 0, 7); ctx.fill();
+    ctx.restore();
+    // Eye
     ctx.fillStyle = "#0d141a";
-    ctx.beginPath(); ctx.arc(bodyRX * 0.82, -2, 1.4, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(bodyRX * 0.72, -bodyRY * 0.35, 1.6, 0, 7); ctx.fill();
     ctx.fillStyle = "#fff";
-    ctx.fillRect(bodyRX * 0.82, -3, 0.9, 0.9);
-    // Tiny mouth
-    ctx.strokeStyle = "#4a1a10"; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.moveTo(bodyRX * 0.95, 1); ctx.lineTo(bodyRX * 1.05, 1); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bodyRX * 0.76, -bodyRY * 0.42, 0.6, 0, 7); ctx.fill();
+    // Mouth
+    ctx.strokeStyle = "#4a1a10"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(bodyRX * 0.9, bodyRY * 0.2);
+    ctx.quadraticCurveTo(bodyRX * 1.05, bodyRY * 0.15, bodyRX * 1.05, bodyRY * 0.35);
+    ctx.stroke();
+    // Pelvic fin below body
+    ctx.fillStyle = "rgba(212,64,42,0.6)";
+    ctx.beginPath();
+    ctx.moveTo(-bodyRX * 0.2, bodyRY * 0.9);
+    ctx.quadraticCurveTo(-bodyRX * 0.05, bodyRY * 1.5, -bodyRX * 0.4, bodyRY * 1.3);
+    ctx.closePath(); ctx.fill();
 
     ctx.restore();
 
-    // Hazard tips at the end of each spike (world coords). Small warning dot.
+    // Hazard tips at the TOP of each spike (world coords, drawn last).
+    // Small yellow warning dot - the visible circle IS the kill zone.
     for (let i = 0; i < L.spikes; i++) {
       const tip = Sim._lionfishTip(f, i);
-      ctx.fillStyle = "rgba(255,224,102,0.45)";
+      ctx.fillStyle = "rgba(255,224,102,0.42)";
       ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR, 0, 7); ctx.fill();
       ctx.strokeStyle = "#3a2612"; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR * 0.55, 0, 7); ctx.stroke();
       ctx.fillStyle = "#ffe066";
-      ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR * 0.35, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR * 0.32, 0, 7); ctx.fill();
     }
   },
 
@@ -564,43 +596,91 @@ export const Render = {
     // Small drifting bob so the boat feels alive on the surface.
     ctx.rotate(Math.sin(state.frame * 0.03 + b.id) * 0.02);
 
-    // Hull: bottom below the water, tapered "V" cross-section. Only a strip
-    // of the hull sits below the surface so the player sees it moving through
-    // the top of the water rather than the full boat outline.
+    // A proper large hull: the SUBMERGED half sits below the water surface
+    // (that's the part the diver sees), and a slim deck strip peeks above.
     const w = B.hullW, h = B.hullH;
-    // Hull below water
-    ctx.fillStyle = "#4a2f18";
+    // Hull below water - tapered "V" cross-section
+    ctx.fillStyle = "#3d2612";
     ctx.beginPath();
     ctx.moveTo(-w / 2, 0);
     ctx.lineTo(w / 2, 0);
-    ctx.quadraticCurveTo(w / 2 - 8, h * 0.7, w / 2 - 16, h);
-    ctx.lineTo(-w / 2 + 16, h);
-    ctx.quadraticCurveTo(-w / 2 + 8, h * 0.7, -w / 2, 0);
+    ctx.quadraticCurveTo(w / 2 - 12, h * 0.65, w / 2 - 30, h);
+    ctx.lineTo(-w / 2 + 30, h);
+    ctx.quadraticCurveTo(-w / 2 + 12, h * 0.65, -w / 2, 0);
     ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = "#20130a"; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.strokeStyle = "#180e05"; ctx.lineWidth = 1.5; ctx.stroke();
 
-    // Waterline plank highlight
-    ctx.fillStyle = "#6b3f1f";
-    ctx.fillRect(-w / 2 + 2, -2, w - 4, 4);
+    // Hull planking - a couple of horizontal grain lines for depth
+    ctx.strokeStyle = "#2a1a0a"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-w / 2 + 4, h * 0.35); ctx.lineTo(w / 2 - 4, h * 0.35);
+    ctx.moveTo(-w / 2 + 12, h * 0.7); ctx.lineTo(w / 2 - 12, h * 0.7);
+    ctx.stroke();
 
-    // Deck stripe (above water) for a sliver of contrast.
+    // Waterline plank (a bright brown band right at the water level)
+    ctx.fillStyle = "#7a4720";
+    ctx.fillRect(-w / 2 + 3, -3, w - 6, 5);
+    ctx.strokeStyle = "#3a2210"; ctx.lineWidth = 0.8;
+    ctx.strokeRect(-w / 2 + 3, -3, w - 6, 5);
+
+    // Deck strip peeking above the water
     ctx.fillStyle = "#8b5a2b";
-    ctx.fillRect(-w / 2 + 6, -6, w - 12, 4);
+    ctx.fillRect(-w / 2 + 10, -9, w - 20, 6);
+    ctx.strokeStyle = "#4a2a10"; ctx.lineWidth = 0.8;
+    ctx.strokeRect(-w / 2 + 10, -9, w - 20, 6);
 
-    // A tiny anchor winch on the deck near the drop side so the "boat drops
-    // the anchor" reading is unambiguous. Placed at the LEFT (the boat is
-    // moving left and drops the anchor as it passes over the target).
+    // Small superstructure (bridge cabin) near the stern (right side, since
+    // the boat is heading LEFT, the stern is behind - visually on the right).
+    ctx.fillStyle = "#c4a670";
+    ctx.fillRect(w * 0.20, -20, w * 0.16, 11);
+    ctx.strokeStyle = "#4a3520"; ctx.lineWidth = 0.9;
+    ctx.strokeRect(w * 0.20, -20, w * 0.16, 11);
+    // Cabin windows
+    ctx.fillStyle = "#152a3a";
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(w * 0.20 + 4 + i * (w * 0.16 - 8) / 3, -17, 5, 4);
+    }
+    // Little chimney stack
+    ctx.fillStyle = "#2a1a10";
+    ctx.fillRect(w * 0.28, -26, 5, 7);
+    // Puff of smoke
+    ctx.fillStyle = "rgba(230,230,230,0.55)";
+    const smokeShift = (state.frame * 0.3) % 12;
+    ctx.beginPath(); ctx.arc(w * 0.31 - smokeShift, -30 - smokeShift * 0.4, 3, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(w * 0.29 - smokeShift * 0.6, -34 - smokeShift * 0.3, 2.4, 0, 7); ctx.fill();
+
+    // Anchor winch + capstan near the bow (left side - where the anchor
+    // deploys as the boat moves left over its target).
     ctx.fillStyle = "#3a2f22";
-    ctx.fillRect(-w * 0.25 - 3, -10, 6, 5);
+    ctx.fillRect(-w * 0.35, -14, 12, 5);
+    ctx.fillStyle = "#6b6558";
+    ctx.beginPath(); ctx.arc(-w * 0.33, -12, 3, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#1a1510"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(-w * 0.33, -12, 3, 0, 7); ctx.stroke();
+
+    // Bow rail sticking up at the very front (left)
+    ctx.strokeStyle = "#3a2210"; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(-w / 2 + 8, -8);
+    ctx.lineTo(-w / 2 + 12, -12);
+    ctx.lineTo(-w / 2 + 22, -12);
+    ctx.stroke();
 
     ctx.restore();
 
-    // A little "wake" splash trailing behind the boat as it moves left.
+    // Bow wake as the ship pushes water aside (in front of and behind hull)
+    ctx.fillStyle = "rgba(220,240,255,0.45)";
+    for (let i = 0; i < 4; i++) {
+      const wx = b.x - w * 0.5 - i * 8;
+      const wy = W.waterTop + Math.sin(state.frame * 0.2 + i) * 1.6;
+      ctx.beginPath(); ctx.arc(wx, wy, 2.4, 0, 7); ctx.fill();
+    }
+    // Stern wake trailing behind
     ctx.fillStyle = "rgba(220,240,255,0.35)";
-    for (let i = 0; i < 3; i++) {
-      const wx = b.x + w * 0.5 + i * 6;
-      const wy = W.waterTop + Math.sin(state.frame * 0.15 + i) * 1.5;
-      ctx.beginPath(); ctx.arc(wx, wy, 2, 0, 7); ctx.fill();
+    for (let i = 0; i < 4; i++) {
+      const wx = b.x + w * 0.5 + i * 10;
+      const wy = W.waterTop + Math.sin(state.frame * 0.15 + i) * 1.8;
+      ctx.beginPath(); ctx.arc(wx, wy, 2.2, 0, 7); ctx.fill();
     }
   },
 
