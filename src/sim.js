@@ -102,12 +102,12 @@ export const CFG = {
     spawnMin: 8, spawnMax: 14,
     maxOnScreen: 2,
     minSpeed: 22, maxSpeed: 42,            // slow leftward drift
-    minY: 200, maxY: 500,                  // hovers mid-water (leaves tentacle room below)
-    scaleMin: 1.05, scaleMax: 1.3,
-    bodyR: 22,                             // mantle radius (chunky)
-    tentacleLen: 52,                       // vertical reach of the tentacle tips
+    minY: 210, maxY: 510,                  // hovers mid-water (leaves tentacle room below)
+    scaleMin: 0.95, scaleMax: 1.15,
+    bodyR: 16,                             // mantle radius (compact)
+    tentacleLen: 40,                       // vertical reach of the tentacle tips
     tentacles: 8,
-    tipR: 11,                              // kill radius of each blue-ring stinger
+    tipR: 10,                              // kill radius of each blue-ring stinger
     // Tentacles fan out in the DOWNWARD half circle: angle in [spreadMin, spreadMax]
     // where 0 = +X (right), pi/2 = +Y (down), pi = -X (left).
     spreadMin: Math.PI * 0.18,             // lower-right
@@ -122,17 +122,17 @@ export const CFG = {
     spawnMin: 9, spawnMax: 15,
     maxOnScreen: 2,
     minSpeed: 30, maxSpeed: 55,
-    minY: 180, maxY: 560,
-    scaleMin: 1.0, scaleMax: 1.35,
-    bodyRX: 22, bodyRY: 11,                // body ellipse (cosmetic)
+    minY: 190, maxY: 570,
+    scaleMin: 0.95, scaleMax: 1.2,
+    bodyRX: 17, bodyRY: 8,                 // body ellipse (cosmetic, smaller)
     spikes: 7,                             // dorsal fin rays fanning up
-    spikeLen: 34,                          // vertical reach of the spike tips above the body
-    tipR: 8,                               // kill radius of each spike-top hazard
+    spikeLen: 22,                          // shorter than before, kept modest
+    tipR: 7,                               // kill radius of each spike-top hazard
     // Spikes rise from the top of the body along its length. rootSpread is
     // the horizontal span (as a fraction of bodyRX) they cover.
     rootSpread: 1.4,
     // Slight outward lean of the outermost spikes (radians).
-    tiltAmp: 0.35,
+    tiltAmp: 0.32,
     swayAmp: 0.06
   },
   anchor: {

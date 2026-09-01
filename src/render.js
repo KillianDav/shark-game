@@ -350,29 +350,35 @@ export const Render = {
       ctx.stroke();
     }
 
-    // Mantle: bulbous head-body sitting ABOVE the tentacle roots.
+    // Mantle: bulbous "onion-dome" / mushroom-cap silhouette sitting ABOVE
+    // the tentacle roots. Wider through the middle, tapered top and bottom -
+    // the stereotypical cartoon-octopus head shape.
     ctx.save();
     ctx.translate(o.x, o.y);
-    // Slight upward bulge shape (rounded on top, gently rounded underneath).
+    const bR = bodyR;
     ctx.fillStyle = "#5a1c3e";
     ctx.beginPath();
-    ctx.ellipse(0, -bodyR * 0.15, bodyR, bodyR * 1.1, 0, 0, 7);
+    ctx.moveTo(0, -bR * 1.15);                                                          // top peak
+    ctx.bezierCurveTo( bR * 1.15, -bR * 1.15,  bR * 1.15, bR * 0.15,  bR * 0.72, bR * 0.55);  // right side down
+    ctx.bezierCurveTo( bR * 0.5,  bR * 0.85, -bR * 0.5,  bR * 0.85, -bR * 0.72, bR * 0.55);  // pinched bottom
+    ctx.bezierCurveTo(-bR * 1.15, bR * 0.15, -bR * 1.15, -bR * 1.15, 0, -bR * 1.15);         // left side back up
+    ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = "#3a0f28"; ctx.lineWidth = 1.3; ctx.stroke();
     // Top highlight for a shiny bulb feel
     ctx.fillStyle = "#8a3768";
     ctx.beginPath();
-    ctx.ellipse(-bodyR * 0.15, -bodyR * 0.65, bodyR * 0.55, bodyR * 0.28, -0.2, 0, 7);
+    ctx.ellipse(-bR * 0.15, -bR * 0.75, bR * 0.5, bR * 0.24, -0.2, 0, 7);
     ctx.fill();
     // A few faint blue rings on the mantle for real-world flavour (not the
     // stingers - those are only at the tentacle tips).
     ctx.strokeStyle = "#0a3d8a"; ctx.lineWidth = 1;
     ctx.fillStyle = "#3af0ff";
     const mantleRings = [
-      { x: -bodyR * 0.35, y: -bodyR * 0.15, r: 1.6 },
-      { x:  bodyR * 0.30, y: -bodyR * 0.35, r: 1.4 },
-      { x:  bodyR * 0.05, y: -bodyR * 0.05, r: 1.7 },
-      { x: -bodyR * 0.10, y: -bodyR * 0.55, r: 1.3 }
+      { x: -bR * 0.35, y: -bR * 0.15, r: 1.5 },
+      { x:  bR * 0.30, y: -bR * 0.40, r: 1.3 },
+      { x:  bR * 0.05, y: -bR * 0.05, r: 1.6 },
+      { x: -bR * 0.10, y: -bR * 0.65, r: 1.2 }
     ];
     for (const r of mantleRings) {
       ctx.beginPath(); ctx.arc(r.x, r.y, r.r * s, 0, 7); ctx.fill(); ctx.stroke();
@@ -380,11 +386,11 @@ export const Render = {
 
     // Eyes on the front-top of the mantle.
     ctx.fillStyle = "#fff8e0";
-    ctx.beginPath(); ctx.ellipse(-bodyR * 0.32, -bodyR * 0.22, 2.6, 2.0, 0, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.ellipse( bodyR * 0.32, -bodyR * 0.22, 2.6, 2.0, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-bR * 0.36, -bR * 0.32, 2.4, 1.8, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( bR * 0.36, -bR * 0.32, 2.4, 1.8, 0, 0, 7); ctx.fill();
     ctx.fillStyle = "#0d141a";
-    ctx.beginPath(); ctx.arc(-bodyR * 0.32, -bodyR * 0.22, 1.2, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc( bodyR * 0.32, -bodyR * 0.22, 1.2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(-bR * 0.36, -bR * 0.32, 1.1, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc( bR * 0.36, -bR * 0.32, 1.1, 0, 7); ctx.fill();
     ctx.restore();
 
     // Blue-ring stingers at each tentacle TIP (in world coords, drawn last so
