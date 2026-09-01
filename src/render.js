@@ -519,6 +519,102 @@ export const Render = {
     }
   },
 
+  drawEel(ctx, el, frame) {
+    const E = CFG.electricEel;
+    const s = el.scale;
+    const halfLen = E.bodyLen * s;
+    const bodyR = E.bodyR * s;
+    const B = el.buzz;
+
+    // Body path: sine-wave sampled points from head (left, since it swims
+    // right->left) to tail (right). Rendered as a thick round-cap stroke.
+    const pts = [];
+    for (let i = 0; i <= E.segments; i++) {
+      const t = i / E.segments;                       // 0 (head/left) -> 1 (tail/right)
+      const localX = -halfLen + t * (halfLen * 2);
+      const localY = Math.sin(el.swimT * 2.4 + t * 4.5 + el.wavePhase) * (el.waveAmp * s * (0.4 + 0.6 * (1 - Math.abs(t - 0.5) * 2)));
+      pts.push({ x: el.x + localX, y: el.y + localY });
+    }
+    // Outer dark stroke
+    ctx.strokeStyle = "#1a2e0f"; ctx.lineWidth = bodyR * 2 + 2; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+    // Body fill - yellow-green
+    ctx.strokeStyle = "#c5b04a"; ctx.lineWidth = bodyR * 2 - 1;
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+    // Darker back stripe along the top of the eel
+    ctx.strokeStyle = "#5a4a12"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y - bodyR * 0.4);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y - bodyR * 0.4);
+    ctx.stroke();
+
+    // Head details at the FRONT (leftmost point)
+    const head = pts[0];
+    // Eye
+    ctx.fillStyle = "#fff8e0";
+    ctx.beginPath(); ctx.arc(head.x + 2, head.y - 2, 1.6, 0, 7); ctx.fill();
+    ctx.fillStyle = "#0d141a";
+    ctx.beginPath(); ctx.arc(head.x + 2, head.y - 2, 0.9, 0, 7); ctx.fill();
+    // Mouth
+    ctx.strokeStyle = "#1a2e0f"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(head.x - 3, head.y + 1); ctx.lineTo(head.x + 1, head.y + 1); ctx.stroke();
+
+    // Electric BUZZ rendering. The visible aura + bolts are the kill zone.
+    if (B.state === "windup") {
+      // Softer telegraph: faint dashed ring + a couple of tiny sparks near
+      // the body so the player knows a shock is coming.
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = "rgba(150,220,255,0.55)"; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(el.x, el.y, E.buzzR * 0.7, 0, 7); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(180,240,255,0.7)";
+      const jitter = (i, ph) => Math.sin(frame * 0.6 + i + ph) * 0.5 + 0.5;
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + el.wavePhase;
+        const rr = E.buzzR * 0.35 * jitter(i, el.id);
+        ctx.beginPath(); ctx.arc(el.x + Math.cos(a) * rr, el.y + Math.sin(a) * rr, 1.4, 0, 7); ctx.fill();
+      }
+    } else if (B.state === "active") {
+      // Bright aura at the kill radius
+      const pulse = 0.85 + 0.15 * Math.sin(frame * 0.8);
+      ctx.fillStyle = "rgba(180,240,255,0.28)";
+      ctx.beginPath(); ctx.arc(el.x, el.y, E.buzzR * pulse, 0, 7); ctx.fill();
+      ctx.strokeStyle = "rgba(210,245,255,0.85)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(el.x, el.y, E.buzzR, 0, 7); ctx.stroke();
+      // Jagged lightning bolts radiating out from the body. Frame-driven but
+      // deterministic per (eel, bolt, sub-segment).
+      const bolts = 7;
+      for (let b = 0; b < bolts; b++) {
+        const ang = (b / bolts) * Math.PI * 2 + el.wavePhase + Math.sin(frame * 0.12 + b) * 0.6;
+        const segs = 4;
+        ctx.strokeStyle = "rgba(255,255,255,0.95)"; ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(el.x, el.y);
+        for (let k = 1; k <= segs; k++) {
+          const t = k / segs;
+          const rr = E.buzzR * t * (0.85 + 0.15 * Math.sin(frame * 0.7 + b * 1.7 + k));
+          const jitterAng = ang + Math.sin(frame * 0.5 + b * 2 + k * 1.3) * 0.35;
+          ctx.lineTo(el.x + Math.cos(jitterAng) * rr, el.y + Math.sin(jitterAng) * rr);
+        }
+        ctx.stroke();
+        // Cyan glow overlay
+        ctx.strokeStyle = "rgba(120,220,255,0.85)"; ctx.lineWidth = 3.2;
+        ctx.stroke();
+      }
+      // Tiny sparks along the body ridge
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      for (let i = 0; i < E.segments; i += 2) {
+        const p = pts[i];
+        const jx = p.x + Math.sin(frame * 0.9 + i) * 3;
+        const jy = p.y - 4 + Math.cos(frame * 0.7 + i) * 3;
+        ctx.beginPath(); ctx.arc(jx, jy, 1.2, 0, 7); ctx.fill();
+      }
+    }
+  },
+
   drawAnchor(ctx, a, frame) {
     const s = a.scale;
     const W = CFG.world;
@@ -705,7 +801,7 @@ export const Render = {
         scale = 1 - t * 0.6;
         vaporSparks = true;
         showName = false;
-      } else if (p.deathKind === "stung" || p.deathKind === "octopus" || p.deathKind === "lionfish") {
+      } else if (p.deathKind === "stung" || p.deathKind === "octopus" || p.deathKind === "lionfish" || p.deathKind === "electric") {
         // Stung / octopus tip / lionfish spike - all toxin-style deaths: a quick
         // electric flicker then shrink. Distinct from "eaten" so the player can
         // tell what killed them.
@@ -1238,6 +1334,11 @@ export const Render = {
       for (const f of state.lionfish) Render.drawLionfish(ctx, f, state.frame);
     }
 
+    // --- electric eels ---
+    if (state.eels) {
+      for (const el of state.eels) Render.drawEel(ctx, el, state.frame);
+    }
+
     // --- anchors (drawn in front so nothing overlaps the falling body) ---
     if (state.anchors) {
       for (const a of state.anchors) Render.drawAnchor(ctx, a, state.frame);
@@ -1296,10 +1397,11 @@ export const Render = {
       const rayCount = (state.stingrays && state.stingrays.length) || 0;
       const octCount = (state.octopuses && state.octopuses.length) || 0;
       const lionCount = (state.lionfish && state.lionfish.length) || 0;
+      const eelCount = (state.eels && state.eels.length) || 0;
       const anchorCount = (state.anchors && state.anchors.length) || 0;
       const hazardBit = state.hazards === "sharks-only"
         ? `sharks ${state.sharks.length}`
-        : `sharks ${state.sharks.length} \u2022 rays ${rayCount} \u2022 octo ${octCount} \u2022 lion ${lionCount} \u2022 anch ${anchorCount}`;
+        : `sh ${state.sharks.length} \u2022 ry ${rayCount} \u2022 oc ${octCount} \u2022 li ${lionCount} \u2022 ee ${eelCount} \u2022 an ${anchorCount}`;
       ctx.font = "bold 16px 'Segoe UI', sans-serif";
       label(`Size tier ${tier}   \u2022   tempo x${spd}   \u2022   ${hazardBit}`, W.w - 16, "right");
     } else {

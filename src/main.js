@@ -160,6 +160,7 @@ function endGame(state) {
               : winner && winner.deathKind === "stung" ? "stung by a ray"
               : winner && winner.deathKind === "octopus" ? "zapped by a blue-ring"
               : winner && winner.deathKind === "lionfish" ? "spiked by a lionfish"
+              : winner && winner.deathKind === "electric" ? "shocked by an eel"
               : winner && winner.deathKind === "anchor" ? "anchored"
               : "eaten";
     els.resultLead.textContent = "You survived";

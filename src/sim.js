@@ -34,11 +34,12 @@ export const CFG = {
   },
   shark: {
     minSpeed: 175, maxSpeed: 285,
-    // Sharks are sparser AND arrive later than the other hazards - stingrays,
-    // octopuses, and lionfish have the early game to themselves.
-    earliestT: 6,      // no sharks until this many seconds in
-    spawnStart: 3.5,   // seconds between spawns once the earliestT gate opens
-    spawnMin: 0.55,    // fastest spawn interval late-game
+    // Sharks arrive noticeably later than the other hazards so the early
+    // round is a gentle warm-up with rays, octopuses, lionfish, and eels.
+    // Fewer sharks overall - other hazards carry more of the load.
+    earliestT: 14,     // no sharks until this many seconds in
+    spawnStart: 5.5,   // seconds between spawns once the earliestT gate opens
+    spawnMin: 0.9,     // fastest spawn interval late-game
     rampTime: 26,      // seconds to reach peak difficulty (steep, front-loaded)
     rampEase: 0.6,     // <1 front-loads the ramp so it gets hard fast
     minY: 120, maxY: 678,   // reaches the full swimmer range - no safe top/bottom corner
@@ -101,7 +102,10 @@ export const CFG = {
     earliestT: 1,                          // appears from t=1s (before sharks)
     spawnMin: 8, spawnMax: 14,
     maxOnScreen: 2,
-    minSpeed: 22, maxSpeed: 42,            // slow leftward drift
+    // Speed must be greater than the seabed scroll (CFG.world.scrollSpeed = 60)
+    // so the octopus visibly drifts LEFT relative to the moving ocean floor;
+    // slower than scroll makes it appear to drift rightward against the water.
+    minSpeed: 85, maxSpeed: 130,
     minY: 210, maxY: 510,                  // hovers mid-water (leaves tentacle room below)
     scaleMin: 0.95, scaleMax: 1.15,
     bodyR: 16,                             // mantle radius (compact)
@@ -134,6 +138,28 @@ export const CFG = {
     // Slight outward lean of the outermost spikes (radians).
     tiltAmp: 0.32,
     swayAmp: 0.06
+  },
+  electricEel: {
+    // Long slender eel that swims right-to-left, intermittently discharging
+    // a bright electric BUZZ. The buzz is telegraphed with a windup then goes
+    // lethal for a short window inside a circle around the body. Body itself
+    // is safe to touch when not buzzing.
+    earliestT: 5,                            // enters early, still before sharks
+    spawnMin: 12, spawnMax: 20,
+    maxOnScreen: 1,
+    minSpeed: 80, maxSpeed: 130,             // faster than seabed scroll - clearly moving left
+    minY: 220, maxY: 560,
+    scaleMin: 1.0, scaleMax: 1.25,
+    bodyLen: 55,                             // half-length of the body along the swim axis
+    bodyR: 6,                                // body thickness (radius)
+    segments: 12,                            // number of body segments for the sine undulation
+    waveAmpMin: 8, waveAmpMax: 14,
+    waveFreqMin: 0.5, waveFreqMax: 0.9,
+    // Buzz state machine
+    buzzCooldownMin: 3.2, buzzCooldownMax: 5.5,
+    buzzWindup: 0.45,                        // telegraph (small sparks, harmless)
+    buzzActive: 0.32,                        // shock crackles all around body - LETHAL
+    buzzR: 46                                // kill circle radius during the buzz
   },
   anchor: {
     // Rare falling anchor, preceded by a boat visibly crossing the water
@@ -176,20 +202,20 @@ export const CFG = {
 export const DIFFICULTIES = {
   easy: {
     label: "Easy",
-    // Sharks are delayed further and pace stays low; other hazards still
-    // arrive first so the round starts with the calmer creatures.
+    // Sharks arrive last, other hazards trickle in gently.
     shark: {
-      earliestT: 12,
-      spawnStart: 4.5, spawnMin: 0.9,
+      earliestT: 22,
+      spawnStart: 6.5, spawnMin: 1.3,
       rampTime: 36, rampEase: 0.75,
-      laserChance: 0.38, laserCooldownMin: 1.8, laserCooldownMax: 4.0,
-      sizeStepPerTier: 0.13, tierSeconds: 20, scaleCap: 3.0
+      laserChance: 0.32, laserCooldownMin: 2.0, laserCooldownMax: 4.5,
+      sizeStepPerTier: 0.12, tierSeconds: 22, scaleCap: 3.0
     },
-    stingray: { earliestT: 2, spawnMin: 8, spawnMax: 13, maxOnScreen: 1 },
-    octopus:  { earliestT: 3, spawnMin: 12, spawnMax: 18, maxOnScreen: 1 },
-    lionfish: { earliestT: 5, spawnMin: 14, spawnMax: 22, maxOnScreen: 1 },
-    anchor:   { earliestT: 20, spawnMin: 14, spawnMax: 24 },
-    progression: { speedPerSec: 0.013, speedMax: 2.0 }
+    stingray:    { earliestT: 3, spawnMin: 10, spawnMax: 15, maxOnScreen: 1 },
+    octopus:     { earliestT: 5, spawnMin: 14, spawnMax: 20, maxOnScreen: 1 },
+    lionfish:    { earliestT: 7, spawnMin: 16, spawnMax: 24, maxOnScreen: 1 },
+    electricEel: { earliestT: 9, spawnMin: 18, spawnMax: 28, maxOnScreen: 1 },
+    anchor:      { earliestT: 20, spawnMin: 16, spawnMax: 28 },
+    progression: { speedPerSec: 0.011, speedMax: 1.9 }
   },
   medium: {
     label: "Medium"
@@ -200,16 +226,17 @@ export const DIFFICULTIES = {
     // Sharks arrive sooner and heavier; other hazards still lead the round
     // by a couple of seconds.
     shark: {
-      earliestT: 3,
-      spawnStart: 2.2, spawnMin: 0.32,
+      earliestT: 6,
+      spawnStart: 3.0, spawnMin: 0.4,
       rampTime: 18, rampEase: 0.5,
       laserChance: 0.75, laserCooldownMin: 0.8, laserCooldownMax: 2.0,
       sizeStepPerTier: 0.22, tierSeconds: 10, scaleCap: 3.8
     },
-    stingray: { earliestT: 0.5, spawnMin: 3.0, spawnMax: 5.0, maxOnScreen: 3 },
-    octopus:  { earliestT: 1,   spawnMin: 6, spawnMax: 10, maxOnScreen: 3 },
-    lionfish: { earliestT: 1.5, spawnMin: 6.5, spawnMax: 11, maxOnScreen: 3 },
-    anchor:   { earliestT: 8,   spawnMin: 5, spawnMax: 11 },
+    stingray:    { earliestT: 0.5, spawnMin: 3.0, spawnMax: 5.0, maxOnScreen: 3 },
+    octopus:     { earliestT: 1,   spawnMin: 6,   spawnMax: 10,  maxOnScreen: 3 },
+    lionfish:    { earliestT: 1.5, spawnMin: 6.5, spawnMax: 11,  maxOnScreen: 3 },
+    electricEel: { earliestT: 2,   spawnMin: 6,   spawnMax: 10,  maxOnScreen: 2 },
+    anchor:      { earliestT: 8,   spawnMin: 5,   spawnMax: 11 },
     progression: { speedPerSec: 0.028, speedMax: 3.0 }
   }
 };
@@ -220,12 +247,13 @@ export const DIFFICULTIES = {
 function _resolveDiff(name) {
   const preset = DIFFICULTIES[name] || DIFFICULTIES.medium;
   return {
-    shark:       { ...CFG.shark,       ...(preset.shark       || {}) },
-    stingray:    { ...CFG.stingray,    ...(preset.stingray    || {}) },
-    octopus:     { ...CFG.octopus,     ...(preset.octopus     || {}) },
-    lionfish:    { ...CFG.lionfish,    ...(preset.lionfish    || {}) },
-    anchor:      { ...CFG.anchor,      ...(preset.anchor      || {}) },
-    progression: { ...CFG.progression, ...(preset.progression || {}) }
+    shark:       { ...CFG.shark,       ...(preset.shark        || {}) },
+    stingray:    { ...CFG.stingray,    ...(preset.stingray     || {}) },
+    octopus:     { ...CFG.octopus,     ...(preset.octopus      || {}) },
+    lionfish:    { ...CFG.lionfish,    ...(preset.lionfish     || {}) },
+    electricEel: { ...CFG.electricEel, ...(preset.electricEel  || {}) },
+    anchor:      { ...CFG.anchor,      ...(preset.anchor       || {}) },
+    progression: { ...CFG.progression, ...(preset.progression  || {}) }
   };
 }
 
@@ -290,6 +318,7 @@ export const Sim = {
       stingrays: [],
       octopuses: [],
       lionfish: [],
+      eels: [],
       boats: [],
       anchors: [],
       coffins: [],
@@ -297,14 +326,16 @@ export const Sim = {
       nextStingrayId: 1,
       nextOctopusId: 1,
       nextLionfishId: 1,
+      nextEelId: 1,
       nextBoatId: 1,
       nextAnchorId: 1,
       nextCoffinId: 1,
-      spawnTimer: 0.5,                             // starts ticking once t >= shark.earliestT
-      raySpawnTimer:      diff.stingray.earliestT, // first ray no earlier than earliestT
-      octopusSpawnTimer:  diff.octopus.earliestT,  // first octopus no earlier than earliestT
-      lionfishSpawnTimer: diff.lionfish.earliestT, // first lionfish no earlier than earliestT
-      anchorSpawnTimer:   diff.anchor.earliestT,   // first anchor no earlier than earliestT
+      spawnTimer: 0.5,                                    // starts ticking once t >= shark.earliestT
+      raySpawnTimer:      diff.stingray.earliestT,        // first ray no earlier than earliestT
+      octopusSpawnTimer:  diff.octopus.earliestT,         // first octopus no earlier than earliestT
+      lionfishSpawnTimer: diff.lionfish.earliestT,        // first lionfish no earlier than earliestT
+      eelSpawnTimer:      diff.electricEel.earliestT,     // first eel no earlier than earliestT
+      anchorSpawnTimer:   diff.anchor.earliestT,          // first anchor no earlier than earliestT
       winnerId: null
     };
   },
@@ -504,6 +535,28 @@ export const Sim = {
     return { x: l.x + rootX, y: l.y + rootY };
   },
 
+  _spawnEel(state) {
+    const E = state.diff.electricEel, rng = state.rng, W = CFG.world;
+    const speed = lerp(E.minSpeed, E.maxSpeed, rng()) * Sim._speedMul(state, state.t);
+    const scale = lerp(E.scaleMin, E.scaleMax, rng());
+    const baseY = lerp(E.minY, E.maxY, rng());
+    state.eels.push({
+      id: state.nextEelId++,
+      x: W.w + E.bodyLen * scale + 20,     // enter from the right
+      y: baseY, baseY,
+      vx: -speed,                           // swim RIGHT -> LEFT
+      swimT: rng() * 10,
+      waveAmp: lerp(E.waveAmpMin, E.waveAmpMax, rng()),
+      waveFreq: lerp(E.waveFreqMin, E.waveFreqMax, rng()),
+      wavePhase: rng() * Math.PI * 2,
+      scale,
+      buzz: {
+        state: "idle",
+        timer: E.buzzCooldownMin + rng() * (E.buzzCooldownMax - E.buzzCooldownMin)
+      }
+    });
+  },
+
   _spawnAnchor(state, x, y) {
     const A = state.diff.anchor, rng = state.rng;
     const vy = lerp(A.minSpeed, A.maxSpeed, rng()) * Sim._speedMul(state, state.t);
@@ -576,6 +629,14 @@ export const Sim = {
         if (dxt < best) { best = dxt; threatY = tip.y; }
       }
     }
+    // Electric eels: a winding-up or active buzz makes the WHOLE body position
+    // a threat. Steer away from the eel's y.
+    for (const el of state.eels) {
+      const dxe = el.x - p.x;
+      if (dxe < -40 || dxe > detect) continue;
+      const menace = (el.buzz.state !== "idle") ? 0 : 40;   // idle eels are less urgent
+      if (dxe + menace < best) { best = dxe + menace; threatY = el.y; }
+    }
     if (threatY == null) {
       // drift gently toward vertical centre
       const mid = (CFG.world.waterTop + CFG.world.waterBottom) / 2;
@@ -592,7 +653,7 @@ export const Sim = {
     if (state.status === "over") return state;
     const W = CFG.world, P = CFG.player;
     const S = state.diff.shark, R = state.diff.stingray, A = state.diff.anchor;
-    const O = state.diff.octopus, L = state.diff.lionfish;
+    const O = state.diff.octopus, L = state.diff.lionfish, E = state.diff.electricEel;
     state.t += dt;
     state.frame++;
     const m = Sim._speedMul(state, state.t);   // shared tempo: players get faster with the sharks
@@ -638,6 +699,17 @@ export const Sim = {
         state.lionfishSpawnTimer = lerp(L.spawnMin, L.spawnMax, state.rng());
       } else if (state.lionfishSpawnTimer <= 0) {
         state.lionfishSpawnTimer = 0.6;
+      }
+    }
+
+    // --- spawn electric eels on their own timer (cap on screen) ---
+    if (state.hazards !== "sharks-only" && state.t >= E.earliestT) {
+      state.eelSpawnTimer -= dt;
+      if (state.eelSpawnTimer <= 0 && state.eels.length < E.maxOnScreen) {
+        Sim._spawnEel(state);
+        state.eelSpawnTimer = lerp(E.spawnMin, E.spawnMax, state.rng());
+      } else if (state.eelSpawnTimer <= 0) {
+        state.eelSpawnTimer = 0.6;
       }
     }
 
@@ -723,6 +795,26 @@ export const Sim = {
       f.y = clamp(f.baseY + Math.sin(f.swimT * 0.9 + f.wavePhase) * 6, L.minY, L.maxY);
     }
     state.lionfish = state.lionfish.filter((f) => f.x > -60);
+
+    // --- move eels + drive the buzz state machine ---
+    for (const el of state.eels) {
+      el.x += el.vx * dt;
+      el.swimT += dt;
+      el.y = clamp(el.baseY + Math.sin(el.swimT * el.waveFreq + el.wavePhase) * el.waveAmp, E.minY, E.maxY);
+      const B = el.buzz;
+      B.timer -= dt;
+      if (B.state === "idle") {
+        // Only start a buzz while on-screen so an off-screen eel isn't wasting shocks.
+        if (B.timer <= 0 && el.x > 40 && el.x < W.w - 20) {
+          B.state = "windup"; B.timer = E.buzzWindup;
+        }
+      } else if (B.state === "windup") {
+        if (B.timer <= 0) { B.state = "active"; B.timer = E.buzzActive; }
+      } else if (B.state === "active") {
+        if (B.timer <= 0) { B.state = "idle"; B.timer = E.buzzCooldownMin + state.rng() * (E.buzzCooldownMax - E.buzzCooldownMin); }
+      }
+    }
+    state.eels = state.eels.filter((el) => el.x > -80);
 
     // --- coffins stay put at the death spot and cull after their lifetime ---
     const C = CFG.coffin;
@@ -813,6 +905,23 @@ export const Sim = {
           const ex = tip.x - (p.x + bx), ey = tip.y - (p.y + by);
           if (ex * ex + ey * ey <= tipRSq) Sim._kill(state, p, "lionfish", tip.x, tip.y);
         }
+      }
+    }
+
+    // --- electric eel buzz: only ACTIVE state kills, inside a circle around
+    // the eel's body centre. Same circle-vs-ellipse test as the sting. ---
+    for (const el of state.eels) {
+      if (el.buzz.state !== "active") continue;
+      const bRSq = E.buzzR * E.buzzR;
+      for (const p of state.players) {
+        if (!p.alive) continue;
+        const dx = el.x - p.x, dy = el.y - p.y;
+        const nx = dx / P.rx, ny = dy / P.ry;
+        const d = Math.sqrt(nx * nx + ny * ny);
+        if (d <= 1) { Sim._kill(state, p, "electric", el.x, el.y); continue; }
+        const bx = (nx / d) * P.rx, by = (ny / d) * P.ry;
+        const ex = el.x - (p.x + bx), ey = el.y - (p.y + by);
+        if (ex * ex + ey * ey <= bRSq) Sim._kill(state, p, "electric", el.x, el.y);
       }
     }
 
