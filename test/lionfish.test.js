@@ -12,7 +12,7 @@ function stateWithOneLionfish(overrides = {}) {
   s.anchorSpawnTimer = 1e6;
   s.players[0].lives = 1;
   s.lionfish = [{
-    id: 1, x: 800, y: 400, baseY: 400, swimT: 0, wavePhase: 0,
+    id: 1, x: 800, y: 500, baseY: 500, swimT: 0, wavePhase: 0,
     vx: 0, scale: 1.1,
     ...overrides
   }];

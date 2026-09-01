@@ -103,10 +103,10 @@ export const CFG = {
     spawnMin: 8, spawnMax: 14,
     maxOnScreen: 2,
     // Speed must be greater than the seabed scroll (CFG.world.scrollSpeed = 60)
-    // so the octopus visibly drifts LEFT relative to the moving ocean floor;
-    // slower than scroll makes it appear to drift rightward against the water.
-    minSpeed: 85, maxSpeed: 130,
-    minY: 210, maxY: 510,                  // hovers mid-water (leaves tentacle room below)
+    // so the octopus visibly drifts LEFT relative to the moving ocean floor.
+    // Mid pace: slower than the eel, quicker than the lionfish.
+    minSpeed: 75, maxSpeed: 105,
+    minY: 210, maxY: 490,                  // hovers mid-water (leaves tentacle room below)
     scaleMin: 0.95, scaleMax: 1.15,
     bodyR: 16,                             // mantle radius (compact)
     tentacleLen: 40,                       // vertical reach of the tentacle tips
@@ -125,8 +125,10 @@ export const CFG = {
     earliestT: 3,                          // appears from t=3s (still before sharks)
     spawnMin: 9, spawnMax: 15,
     maxOnScreen: 2,
-    minSpeed: 30, maxSpeed: 55,
-    minY: 190, maxY: 570,
+    // Slowest of the three "hovering" hazards; clearly slower than octopus/eel.
+    minSpeed: 50, maxSpeed: 78,
+    // Lower part of the water - lionfish hug the lower third near the seabed.
+    minY: 460, maxY: 645,
     scaleMin: 0.95, scaleMax: 1.2,
     bodyRX: 17, bodyRY: 8,                 // body ellipse (cosmetic, smaller)
     spikes: 7,                             // dorsal fin rays fanning up
@@ -147,7 +149,7 @@ export const CFG = {
     earliestT: 5,                            // enters early, still before sharks
     spawnMin: 12, spawnMax: 20,
     maxOnScreen: 1,
-    minSpeed: 105, maxSpeed: 160,            // clearly faster than the seabed scroll
+    minSpeed: 140, maxSpeed: 205,            // fastest of the hovering hazards - clearly quicker than the lionfish and octopus
     minY: 220, maxY: 560,
     scaleMin: 1.0, scaleMax: 1.25,
     bodyLen: 55,                             // half-length of the body along the swim axis

@@ -446,29 +446,26 @@ export const Render = {
     }
     ctx.closePath(); ctx.fill();
 
-    // Body: swims RIGHT->LEFT like the other hazards, so the head must be
-    // on the LEFT side. Flip the local frame horizontally so the head-on-
-    // right art below reads as head-on-left in world coords.
+    // Body draws NATIVELY facing left: head at -X (front, in swim direction),
+    // tail at +X (behind). No horizontal flip - it caused confusion before.
     ctx.save();
     ctx.translate(f.x, f.y);
-    ctx.scale(-1, 1);
 
-    // Slight tail fin at the back (drawn on the -X side in this flipped
-    // frame, which lands on the RIGHT of the world - the trailing tail).
+    // Tail fin at the back (right side, since fish swims left -> tail trails).
     ctx.fillStyle = "#c74a2a";
     ctx.beginPath();
-    ctx.moveTo(-bodyRX, 0);
-    ctx.lineTo(-bodyRX * 1.6, -bodyRY * 0.9);
-    ctx.lineTo(-bodyRX * 1.5, 0);
-    ctx.lineTo(-bodyRX * 1.6, bodyRY * 0.9);
+    ctx.moveTo(bodyRX, 0);
+    ctx.lineTo(bodyRX * 1.6, -bodyRY * 0.9);
+    ctx.lineTo(bodyRX * 1.5, 0);
+    ctx.lineTo(bodyRX * 1.6, bodyRY * 0.9);
     ctx.closePath(); ctx.fill();
     ctx.strokeStyle = "#2f1810"; ctx.lineWidth = 1; ctx.stroke();
 
-    // Pectoral fin on the side (feathered look)
+    // Pectoral fin (near the head, underside - drawn on the LEFT-BOTTOM).
     ctx.fillStyle = "rgba(212,64,42,0.55)";
     ctx.beginPath();
     ctx.moveTo(-bodyRX * 0.1, bodyRY * 0.4);
-    ctx.quadraticCurveTo(bodyRX * 0.1, bodyRY * 1.4, -bodyRX * 0.5, bodyRY * 1.1);
+    ctx.quadraticCurveTo(-bodyRX * 0.1, bodyRY * 1.4, bodyRX * 0.5, bodyRY * 1.1);
     ctx.closePath(); ctx.fill();
 
     // Body ellipse - cream base with warning stripes.
@@ -479,33 +476,33 @@ export const Render = {
     ctx.save();
     ctx.beginPath(); ctx.ellipse(0, 0, bodyRX, bodyRY, 0, 0, 7); ctx.clip();
     ctx.fillStyle = "#c74a2a";
-    for (const bx of [-bodyRX * 0.6, -bodyRX * 0.2, bodyRX * 0.25]) {
+    for (const bx of [-bodyRX * 0.25, bodyRX * 0.2, bodyRX * 0.6]) {
       ctx.fillRect(bx - 2.5 * s, -bodyRY - 1, 5 * s, bodyRY * 2 + 2);
     }
     ctx.restore();
 
-    // Head - just the front third of the body highlighted, with eye + mouth.
+    // Head highlight - front third of the body (LEFT side, since head faces left).
     ctx.fillStyle = "#f6cea0";
     ctx.save();
     ctx.beginPath(); ctx.ellipse(0, 0, bodyRX, bodyRY, 0, 0, 7); ctx.clip();
-    ctx.beginPath(); ctx.arc(bodyRX * 0.7, 0, bodyRY * 1.2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(-bodyRX * 0.7, 0, bodyRY * 1.2, 0, 7); ctx.fill();
     ctx.restore();
-    // Eye
+    // Eye on the head (upper LEFT).
     ctx.fillStyle = "#0d141a";
-    ctx.beginPath(); ctx.arc(bodyRX * 0.72, -bodyRY * 0.35, 1.6, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(-bodyRX * 0.72, -bodyRY * 0.35, 1.6, 0, 7); ctx.fill();
     ctx.fillStyle = "#fff";
-    ctx.beginPath(); ctx.arc(bodyRX * 0.76, -bodyRY * 0.42, 0.6, 0, 7); ctx.fill();
-    // Mouth
+    ctx.beginPath(); ctx.arc(-bodyRX * 0.76, -bodyRY * 0.42, 0.6, 0, 7); ctx.fill();
+    // Mouth on the leftmost tip of the head.
     ctx.strokeStyle = "#4a1a10"; ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(bodyRX * 0.9, bodyRY * 0.2);
-    ctx.quadraticCurveTo(bodyRX * 1.05, bodyRY * 0.15, bodyRX * 1.05, bodyRY * 0.35);
+    ctx.moveTo(-bodyRX * 0.9, bodyRY * 0.2);
+    ctx.quadraticCurveTo(-bodyRX * 1.05, bodyRY * 0.15, -bodyRX * 1.05, bodyRY * 0.35);
     ctx.stroke();
-    // Pelvic fin below body
+    // Pelvic fin (rear underside - drawn on the RIGHT-BOTTOM).
     ctx.fillStyle = "rgba(212,64,42,0.6)";
     ctx.beginPath();
-    ctx.moveTo(-bodyRX * 0.2, bodyRY * 0.9);
-    ctx.quadraticCurveTo(-bodyRX * 0.05, bodyRY * 1.5, -bodyRX * 0.4, bodyRY * 1.3);
+    ctx.moveTo(bodyRX * 0.2, bodyRY * 0.9);
+    ctx.quadraticCurveTo(bodyRX * 0.05, bodyRY * 1.5, bodyRX * 0.4, bodyRY * 1.3);
     ctx.closePath(); ctx.fill();
 
     ctx.restore();
@@ -1224,15 +1221,22 @@ export const Render = {
     while (x < W.w - 20) {
       const roll = rng();
       const y = W.waterBottom + 2;
-      if (roll < 0.48) {
+      if (roll < 0.38) {
         items.push({ kind: "kelp", x, y, h: 28 + rng() * 38, hue: rng(), phase: rng() * 6, stems: 2 + ((rng() * 3) | 0) });
         x += 36 + rng() * 40;
-      } else if (roll < 0.64) {
+      } else if (roll < 0.52) {
         items.push({ kind: "coral", x, y, s: 0.7 + rng() * 0.7, tint: rng() });
         x += 40 + rng() * 30;
-      } else if (roll < 0.80) {
-        items.push({ kind: "rock", x, y, w: 14 + rng() * 18, h: 8 + rng() * 8 });
-        x += 34 + rng() * 28;
+      } else if (roll < 0.78) {
+        // Rocks: broader size range - a mix of pebbles and proper boulders,
+        // with a small chance of a landmark-sized rock. Bigger and more
+        // frequent than before.
+        const isBig = rng() < 0.25;
+        const w = isBig ? 42 + rng() * 22 : 22 + rng() * 24;
+        const h = isBig ? 24 + rng() * 14 : 12 + rng() * 12;
+        const rot = (rng() - 0.5) * 0.4;
+        items.push({ kind: "rock", x, y, w, h, rot, seed: rng() });
+        x += (isBig ? 60 : 36) + rng() * 28;
       } else if (roll < 0.90) {
         items.push({ kind: "starfish", x, y: y - 1, s: 1.05 + rng() * 0.25, rot: rng() * 0.8, phase: rng() * 6 });
         x += 90 + rng() * 50;
@@ -1287,10 +1291,31 @@ export const Render = {
   },
 
   drawRock(ctx, it) {
-    ctx.fillStyle = "#2a3d4a";
-    ctx.beginPath(); ctx.ellipse(it.x, it.y - it.h * 0.35, it.w * 0.55, it.h * 0.7, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = "#3a5160";
-    ctx.beginPath(); ctx.ellipse(it.x - 2, it.y - it.h * 0.55, it.w * 0.28, it.h * 0.28, 0, 0, 7); ctx.fill();
+    const rot = it.rot || 0;
+    ctx.save();
+    ctx.translate(it.x, it.y);
+    ctx.rotate(rot);
+    // Shadow at the base
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath(); ctx.ellipse(0, 0, it.w * 0.55, 3, 0, 0, 7); ctx.fill();
+    // Main boulder - dark slate blue
+    ctx.fillStyle = "#2b3d4a";
+    ctx.beginPath(); ctx.ellipse(0, -it.h * 0.38, it.w * 0.55, it.h * 0.72, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#182631"; ctx.lineWidth = 1; ctx.stroke();
+    // Top highlight (top-left, catches "light")
+    ctx.fillStyle = "#48607a";
+    ctx.beginPath(); ctx.ellipse(-it.w * 0.15, -it.h * 0.62, it.w * 0.32, it.h * 0.24, -0.2, 0, 7); ctx.fill();
+    // A second smaller boulder next to it for cartoon "clump" feel
+    ctx.fillStyle = "#324450";
+    ctx.beginPath(); ctx.ellipse(it.w * 0.28, -it.h * 0.32, it.w * 0.28, it.h * 0.45, 0.15, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#182631"; ctx.lineWidth = 0.7; ctx.stroke();
+    // A crack detail
+    ctx.strokeStyle = "#1a2732"; ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-it.w * 0.15, -it.h * 0.5);
+    ctx.lineTo(it.w * 0.05, -it.h * 0.35);
+    ctx.stroke();
+    ctx.restore();
   },
 
   drawStarfish(ctx, it, frame) {
