@@ -207,7 +207,8 @@ export const Render = {
     const S = CFG.stingray;
     const s = r.scale;
     const T = r.sting;
-    const wingWave = Math.sin(frame * 0.18 + r.id) * 3;
+    const bx = S.bodyRX * s;   // half-length (nose <-> tail base)
+    const by = S.bodyRY * s;   // spine half-thickness at centre
 
     ctx.save();
     ctx.translate(r.x, r.y);
@@ -218,42 +219,68 @@ export const Render = {
     const shadowFade = Math.max(0, 1 - (sandY - r.y) / 60);   // 0 at 60px above sand, 1 at sand
     if (shadowFade > 0) {
       ctx.fillStyle = "rgba(0,0,0," + (0.32 * shadowFade).toFixed(2) + ")";
-      ctx.beginPath(); ctx.ellipse(0, sandY - r.y + 2, S.bodyRX * s * 0.9, 3.2, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, sandY - r.y + 2, bx * 0.9, 3.2, 0, 0, 7); ctx.fill();
     }
 
-    // Body - a flat kite. Two ellipses give the diamond silhouette.
+    // ---- Flapping wings ----
+    // A sine wave travels along the wing edges from front (nose, x=-bx) to
+    // back (tail base, x=+bx). Each sample point on the top / bottom edge
+    // ripples up/down over time - the visible pectoral undulation that
+    // propels the ray forward.
+    const flapAmp = 8 * s;                  // vertical wing-tip amplitude
+    const t = frame * 0.16 + r.id;          // per-ray phase
+    // Sample the top and bottom edges at N points across the body length.
+    const N = 7;
+    const top = [], bot = [];
+    for (let i = 0; i <= N; i++) {
+      const u = i / N;                            // 0..1 across the body
+      const xi = lerp(-bx * 0.92, bx * 0.92, u);
+      // Chord thickness tapers to 0 at nose/tail and is widest in the middle
+      const chord = Math.sin(u * Math.PI);
+      const baseTop = -by * chord - 2;
+      const baseBot =  by * chord + 2;
+      // Wave travels from front to back
+      const wave = Math.sin(t - u * Math.PI * 1.6) * flapAmp * chord;
+      top.push({ x: xi, y: baseTop + wave });
+      bot.push({ x: xi, y: baseBot + wave });
+    }
+
+    // Body fill: closed polygon from top edge (left->right) then bottom edge (right->left).
     ctx.fillStyle = "#453b30";
-    ctx.beginPath(); ctx.ellipse(0, 0, S.bodyRX * s, (S.bodyRY + 1) * s + wingWave * 0.3, 0, 0, 7); ctx.fill();
-    // Front point (nose) - a small triangle poking forward
     ctx.beginPath();
-    ctx.moveTo(-S.bodyRX * s, 0);
-    ctx.lineTo(-S.bodyRX * s - 8 * s, -2);
-    ctx.lineTo(-S.bodyRX * s - 8 * s, 2);
-    ctx.closePath(); ctx.fill();
-    // Highlight along the back so the body reads as 3D-ish
-    ctx.fillStyle = "#5f5344";
-    ctx.beginPath(); ctx.ellipse(-2, -1.5, (S.bodyRX - 6) * s, (S.bodyRY - 1) * s * 0.9, 0, 0, 7); ctx.fill();
-    // Sand-toned spots for cartoon flair
+    // Nose tip at the very front
+    ctx.moveTo(-bx - 6 * s, 0);
+    for (const p of top) ctx.lineTo(p.x, p.y);
+    // Small tail base rounding
+    ctx.lineTo(bx + 2, 0);
+    for (let i = bot.length - 1; i >= 0; i--) ctx.lineTo(bot[i].x, bot[i].y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#26201a"; ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Spine highlight along the centre (lighter shade, follows the wave)
+    ctx.strokeStyle = "#5f5344"; ctx.lineWidth = 2 * s;
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {
+      const u = i / N;
+      const xi = lerp(-bx * 0.85, bx * 0.85, u);
+      const wave = Math.sin(t - u * Math.PI * 1.6) * flapAmp * Math.sin(u * Math.PI) * 0.45;
+      if (i === 0) ctx.moveTo(xi, wave);
+      else ctx.lineTo(xi, wave);
+    }
+    ctx.stroke();
+
+    // Sand-toned spots for cartoon flair (small, sit near the spine)
     ctx.fillStyle = "#786550";
     ctx.beginPath(); ctx.arc(-6 * s, -1, 1.6 * s, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.arc(4 * s, 1, 1.4 * s, 0, 7); ctx.fill();
     ctx.beginPath(); ctx.arc(12 * s, -1, 1.2 * s, 0, 7); ctx.fill();
 
-    // Undulating wing edges - two small curves that flap as the ray glides
-    ctx.strokeStyle = "#332b23"; ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(-S.bodyRX * s * 0.4, -S.bodyRY * s - 1);
-    ctx.quadraticCurveTo(0, -S.bodyRY * s - 2 - wingWave * 0.4, S.bodyRX * s * 0.4, -S.bodyRY * s - 1);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(-S.bodyRX * s * 0.4, S.bodyRY * s + 1);
-    ctx.quadraticCurveTo(0, S.bodyRY * s + 2 + wingWave * 0.4, S.bodyRX * s * 0.4, S.bodyRY * s + 1);
-    ctx.stroke();
-
     // Eyes on top of the body, near the front (leftward-facing).
     ctx.fillStyle = "#0d141a";
-    ctx.beginPath(); ctx.arc(-S.bodyRX * s * 0.55, -1.8, 1.2 * s, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(-S.bodyRX * s * 0.55, 1.8, 1.2 * s, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(-bx * 0.55, -1.8, 1.2 * s, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(-bx * 0.55, 1.8, 1.2 * s, 0, 7); ctx.fill();
 
     // Tail - either trailing behind (idle) or arced up to the strike tip.
     const tailBaseX = S.bodyRX * s - 2;

@@ -74,7 +74,7 @@ export const CFG = {
     earliestT: 1,                 // first ray shortly after round start (before sharks)
     spawnMin: 4.5, spawnMax: 7.0, // seconds between ray spawns (base cadence + randomness)
     maxOnScreen: 2,               // cap - keeps things from piling up
-    minSpeed: 90, maxSpeed: 140,  // slower than sharks (175-285) but clearly moving, not stationary
+    minSpeed: 115, maxSpeed: 170, // slower than sharks (175-285), quicker than the hovering hazards
     minY: 510, maxY: 675,         // lower third of the water (waterTop 96, waterBottom 700)
     scaleMin: 1.2, scaleMax: 1.55,
     bodyRX: 34, bodyRY: 6,        // flat body (cosmetic; the body itself does not kill)
