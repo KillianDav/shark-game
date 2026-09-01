@@ -1228,14 +1228,20 @@ export const Render = {
         items.push({ kind: "coral", x, y, s: 0.7 + rng() * 0.7, tint: rng() });
         x += 40 + rng() * 30;
       } else if (roll < 0.78) {
-        // Rocks: broader size range - a mix of pebbles and proper boulders,
-        // with a small chance of a landmark-sized rock. Bigger and more
-        // frequent than before.
+        // Rocks: broader size range and multiple silhouettes so the seabed
+        // doesn't look like the same clump repeated. Variant picked per rock.
+        const variantRoll = rng();
+        let variant;
+        if      (variantRoll < 0.35) variant = "clump";   // main + companion boulders
+        else if (variantRoll < 0.55) variant = "tall";    // upright pointy rock
+        else if (variantRoll < 0.75) variant = "flat";    // wide low-slung rock
+        else if (variantRoll < 0.90) variant = "stack";   // one boulder balanced on another
+        else                          variant = "jagged"; // craggy top with facets
         const isBig = rng() < 0.25;
         const w = isBig ? 42 + rng() * 22 : 22 + rng() * 24;
         const h = isBig ? 24 + rng() * 14 : 12 + rng() * 12;
         const rot = (rng() - 0.5) * 0.4;
-        items.push({ kind: "rock", x, y, w, h, rot, seed: rng() });
+        items.push({ kind: "rock", x, y, w, h, rot, variant, seed: rng() });
         x += (isBig ? 60 : 36) + rng() * 28;
       } else if (roll < 0.90) {
         items.push({ kind: "starfish", x, y: y - 1, s: 1.05 + rng() * 0.25, rot: rng() * 0.8, phase: rng() * 6 });
@@ -1292,29 +1298,108 @@ export const Render = {
 
   drawRock(ctx, it) {
     const rot = it.rot || 0;
+    const variant = it.variant || "clump";
+    const DARK = "#182631", MID = "#2b3d4a", LIGHT = "#48607a", MID2 = "#324450";
     ctx.save();
     ctx.translate(it.x, it.y);
     ctx.rotate(rot);
-    // Shadow at the base
+    // Common: base shadow
     ctx.fillStyle = "rgba(0,0,0,0.25)";
     ctx.beginPath(); ctx.ellipse(0, 0, it.w * 0.55, 3, 0, 0, 7); ctx.fill();
-    // Main boulder - dark slate blue
-    ctx.fillStyle = "#2b3d4a";
-    ctx.beginPath(); ctx.ellipse(0, -it.h * 0.38, it.w * 0.55, it.h * 0.72, 0, 0, 7); ctx.fill();
-    ctx.strokeStyle = "#182631"; ctx.lineWidth = 1; ctx.stroke();
-    // Top highlight (top-left, catches "light")
-    ctx.fillStyle = "#48607a";
-    ctx.beginPath(); ctx.ellipse(-it.w * 0.15, -it.h * 0.62, it.w * 0.32, it.h * 0.24, -0.2, 0, 7); ctx.fill();
-    // A second smaller boulder next to it for cartoon "clump" feel
-    ctx.fillStyle = "#324450";
-    ctx.beginPath(); ctx.ellipse(it.w * 0.28, -it.h * 0.32, it.w * 0.28, it.h * 0.45, 0.15, 0, 7); ctx.fill();
-    ctx.strokeStyle = "#182631"; ctx.lineWidth = 0.7; ctx.stroke();
-    // A crack detail
-    ctx.strokeStyle = "#1a2732"; ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.moveTo(-it.w * 0.15, -it.h * 0.5);
-    ctx.lineTo(it.w * 0.05, -it.h * 0.35);
-    ctx.stroke();
+
+    if (variant === "tall") {
+      // Upright pointy rock - narrow ellipse with a pointed top
+      const tallH = it.h * 1.5;
+      ctx.fillStyle = MID;
+      ctx.beginPath();
+      ctx.moveTo(-it.w * 0.35, 0);
+      ctx.quadraticCurveTo(-it.w * 0.42, -tallH * 0.55, -it.w * 0.05, -tallH);
+      ctx.quadraticCurveTo(it.w * 0.15, -tallH * 0.75, it.w * 0.4, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = DARK; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = LIGHT;
+      ctx.beginPath();
+      ctx.moveTo(-it.w * 0.28, -tallH * 0.1);
+      ctx.quadraticCurveTo(-it.w * 0.3, -tallH * 0.6, -it.w * 0.02, -tallH * 0.95);
+      ctx.lineTo(-it.w * 0.08, -tallH * 0.85);
+      ctx.quadraticCurveTo(-it.w * 0.18, -tallH * 0.4, -it.w * 0.18, -tallH * 0.1);
+      ctx.closePath(); ctx.fill();
+    }
+    else if (variant === "flat") {
+      // Wide low-slung slab
+      const flatW = it.w * 1.35;
+      ctx.fillStyle = MID;
+      ctx.beginPath(); ctx.ellipse(0, -it.h * 0.28, flatW * 0.55, it.h * 0.55, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = DARK; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = LIGHT;
+      ctx.beginPath(); ctx.ellipse(-flatW * 0.2, -it.h * 0.42, flatW * 0.32, it.h * 0.18, -0.1, 0, 7); ctx.fill();
+      // A small bump on top
+      ctx.fillStyle = MID2;
+      ctx.beginPath(); ctx.ellipse(flatW * 0.1, -it.h * 0.62, it.w * 0.22, it.h * 0.28, 0.15, 0, 7); ctx.fill();
+      ctx.strokeStyle = DARK; ctx.lineWidth = 0.7; ctx.stroke();
+    }
+    else if (variant === "stack") {
+      // One boulder balanced on another
+      ctx.fillStyle = MID;
+      ctx.beginPath(); ctx.ellipse(0, -it.h * 0.28, it.w * 0.55, it.h * 0.55, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = DARK; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = MID2;
+      ctx.beginPath(); ctx.ellipse(-it.w * 0.08, -it.h * 0.85, it.w * 0.38, it.h * 0.42, 0.05, 0, 7); ctx.fill();
+      ctx.strokeStyle = DARK; ctx.lineWidth = 0.9; ctx.stroke();
+      ctx.fillStyle = LIGHT;
+      ctx.beginPath(); ctx.ellipse(-it.w * 0.2, -it.h * 0.98, it.w * 0.18, it.h * 0.14, -0.15, 0, 7); ctx.fill();
+    }
+    else if (variant === "jagged") {
+      // Craggy top with distinct facets
+      const jH = it.h * 1.15;
+      ctx.fillStyle = MID;
+      ctx.beginPath();
+      ctx.moveTo(-it.w * 0.55, 0);
+      ctx.lineTo(-it.w * 0.42, -jH * 0.55);
+      ctx.lineTo(-it.w * 0.18, -jH * 0.85);
+      ctx.lineTo( it.w * 0.02, -jH);
+      ctx.lineTo( it.w * 0.24, -jH * 0.7);
+      ctx.lineTo( it.w * 0.42, -jH * 0.85);
+      ctx.lineTo( it.w * 0.6,  -jH * 0.35);
+      ctx.lineTo( it.w * 0.55, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = DARK; ctx.lineWidth = 1; ctx.stroke();
+      // Lit facets
+      ctx.fillStyle = LIGHT;
+      ctx.beginPath();
+      ctx.moveTo(-it.w * 0.42, -jH * 0.55);
+      ctx.lineTo(-it.w * 0.18, -jH * 0.85);
+      ctx.lineTo( it.w * 0.02, -jH);
+      ctx.lineTo(-it.w * 0.05, -jH * 0.55);
+      ctx.closePath(); ctx.fill();
+      // Shadow facet on the right
+      ctx.fillStyle = DARK;
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath();
+      ctx.moveTo( it.w * 0.02, -jH);
+      ctx.lineTo( it.w * 0.24, -jH * 0.7);
+      ctx.lineTo( it.w * 0.42, -jH * 0.85);
+      ctx.lineTo( it.w * 0.18, -jH * 0.55);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    else {
+      // "clump" - main + companion boulder (the original silhouette)
+      ctx.fillStyle = MID;
+      ctx.beginPath(); ctx.ellipse(0, -it.h * 0.38, it.w * 0.55, it.h * 0.72, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = DARK; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = LIGHT;
+      ctx.beginPath(); ctx.ellipse(-it.w * 0.15, -it.h * 0.62, it.w * 0.32, it.h * 0.24, -0.2, 0, 7); ctx.fill();
+      ctx.fillStyle = MID2;
+      ctx.beginPath(); ctx.ellipse(it.w * 0.28, -it.h * 0.32, it.w * 0.28, it.h * 0.45, 0.15, 0, 7); ctx.fill();
+      ctx.strokeStyle = DARK; ctx.lineWidth = 0.7; ctx.stroke();
+      // A crack detail
+      ctx.strokeStyle = "#1a2732"; ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(-it.w * 0.15, -it.h * 0.5);
+      ctx.lineTo(it.w * 0.05, -it.h * 0.35);
+      ctx.stroke();
+    }
     ctx.restore();
   },
 

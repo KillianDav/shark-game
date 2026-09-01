@@ -104,8 +104,8 @@ export const CFG = {
     maxOnScreen: 2,
     // Speed must be greater than the seabed scroll (CFG.world.scrollSpeed = 60)
     // so the octopus visibly drifts LEFT relative to the moving ocean floor.
-    // Mid pace: slower than the eel, quicker than the lionfish.
-    minSpeed: 75, maxSpeed: 105,
+    // Slowest of the three "hovering" hazards - lionfish and eel are both quicker.
+    minSpeed: 55, maxSpeed: 85,
     minY: 210, maxY: 490,                  // hovers mid-water (leaves tentacle room below)
     scaleMin: 0.95, scaleMax: 1.15,
     bodyR: 16,                             // mantle radius (compact)
@@ -125,8 +125,8 @@ export const CFG = {
     earliestT: 3,                          // appears from t=3s (still before sharks)
     spawnMin: 9, spawnMax: 15,
     maxOnScreen: 2,
-    // Slowest of the three "hovering" hazards; clearly slower than octopus/eel.
-    minSpeed: 50, maxSpeed: 78,
+    // Middle of the three "hovering" hazards - faster than octopus, slower than eel.
+    minSpeed: 95, maxSpeed: 130,
     // Lower part of the water - lionfish hug the lower third near the seabed.
     minY: 460, maxY: 645,
     scaleMin: 0.95, scaleMax: 1.2,
@@ -152,7 +152,7 @@ export const CFG = {
     minSpeed: 140, maxSpeed: 205,            // fastest of the hovering hazards - clearly quicker than the lionfish and octopus
     minY: 220, maxY: 560,
     scaleMin: 1.0, scaleMax: 1.25,
-    bodyLen: 55,                             // half-length of the body along the swim axis
+    bodyLen: 90,                             // half-length of the body (eels are LONG - full length ~180)
     bodyR: 6,                                // body thickness (radius)
     segments: 12,                            // number of body segments for the sine undulation
     waveAmpMin: 8, waveAmpMax: 14,
