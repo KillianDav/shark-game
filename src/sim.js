@@ -163,22 +163,30 @@ export const CFG = {
   },
   anchor: {
     // Rare falling anchor, preceded by a boat visibly crossing the water
-    // surface. The boat picks a mid-screen drop point so the player sees the
-    // anchor coming and has time to dodge in Y. Lethal ONLY on direct body-
-    // overlap - a near-miss to the side passes harmlessly.
+    // surface. The boat moors briefly at a mid-screen drop point, releases
+    // the anchor, waits until it embeds in the seabed, then drifts off.
+    // Lethal ONLY on direct body-overlap - a near-miss to the side passes
+    // harmlessly.
     earliestT: 12,                // no anchors early game
     spawnMin: 8, spawnMax: 16,    // steady cadence with randomness
     minSpeed: 70, maxSpeed: 110,  // slower fall so the player has time to dodge
-    dropMinX: 320, dropMaxX: 1000, // horizontal band where the boat drops (mid-screen)
-    bodyRadius: 20,               // effective anchor hitbox radius (paired with player rx/ry)
-    scaleMin: 1.8, scaleMax: 2.2  // bigger, more menacing anchor
+    dropMinX: 320, dropMaxX: 1000, // horizontal band where the boat drops
+    bodyRadius: 20,                // effective anchor hitbox radius
+    scaleMin: 1.8, scaleMax: 2.2,  // bigger, more menacing anchor
+    // Once embedded: how deep below the seabed the crown sits, and how long
+    // it lingers before it fades out.
+    embedDepth: 8,
+    embedLinger: 3.0
   },
   boat: {
     // A big hull crosses the top of the water and releases an anchor at its
     // targetX - the vessel is deliberately large so it reads as "an actual
     // boat" whose anchor makes sense.
     speed: 45,                    // px/s leftward drift (slower - it's a big ship)
-    hullW: 200, hullH: 44         // sprite footprint, drawn straddling waterTop
+    hullW: 200, hullH: 44,        // sprite footprint, drawn straddling waterTop
+    // Only ONE boat on screen at a time.
+    maxOnScreen: 1,
+    moorDur: 4.0                  // seconds the boat sits still after dropping its anchor
   },
   // Gentle, shared speed-up applied to BOTH shark travel speed and player
   // vertical agility, so the tempo rises but dodging stays just as feasible.
@@ -438,8 +446,9 @@ export const Sim = {
   },
 
   // Spawn a boat crossing the top of the water. When it reaches its targetX
-  // it drops an anchor beneath itself via `_spawnAnchor`. The boat is purely
-  // a visual telegraph so the player sees the anchor coming.
+  // it moors (stops) and releases an anchor beneath itself; after moorDur
+  // seconds it drifts off. The boat is purely a visual telegraph so the
+  // player sees the anchor coming.
   _spawnBoat(state) {
     const B = CFG.boat, A = state.diff.anchor, rng = state.rng, W = CFG.world;
     const targetX = lerp(A.dropMinX, A.dropMaxX, rng());
@@ -449,7 +458,8 @@ export const Sim = {
       y: W.waterTop,                    // hull straddles the surface
       vx: -B.speed,
       targetX,
-      dropped: false,                   // becomes true once the anchor is released
+      state: "approaching",             // "approaching" | "moored" | "leaving"
+      moorTimer: 0,                     // seconds remaining while moored
       scale: 1.0
     });
   },
@@ -566,7 +576,9 @@ export const Sim = {
       x, y,
       vy,
       scale,
-      splash: 0.35              // seconds of surface splash on entry (visual only)
+      splash: 0.35,              // seconds of surface splash on entry (visual only)
+      embedded: false,           // becomes true when the crown touches the seabed
+      embeddedT: 0               // timestamp when it embedded (for the linger + fade)
     });
   },
 
@@ -713,21 +725,35 @@ export const Sim = {
       }
     }
 
-    // --- spawn a BOAT on the anchor timer; boat drops the anchor later ---
+    // --- spawn a BOAT on the anchor timer; boat drops the anchor later.
+    //     Only ONE boat on screen at a time (CFG.boat.maxOnScreen). ---
     if (state.hazards !== "sharks-only" && state.t >= A.earliestT) {
       state.anchorSpawnTimer -= dt;
-      if (state.anchorSpawnTimer <= 0) {
+      if (state.anchorSpawnTimer <= 0 && state.boats.length < CFG.boat.maxOnScreen) {
         Sim._spawnBoat(state);
         state.anchorSpawnTimer = lerp(A.spawnMin, A.spawnMax, state.rng());
+      } else if (state.anchorSpawnTimer <= 0) {
+        // Boat still on screen - retry shortly so the cadence doesn't stall.
+        state.anchorSpawnTimer = 0.6;
       }
     }
 
-    // --- move boats + release anchor when over the drop point ---
+    // --- boats: approach targetX, MOOR (stop) while the anchor sinks, then
+    //     drift off to the left. ---
     for (const b of state.boats) {
-      b.x += b.vx * dt;
-      if (!b.dropped && b.x <= b.targetX) {
-        Sim._spawnAnchor(state, b.x, CFG.world.waterTop - 6);
-        b.dropped = true;
+      if (b.state === "approaching") {
+        b.x += b.vx * dt;
+        if (b.x <= b.targetX) {
+          b.x = b.targetX;
+          b.state = "moored";
+          b.moorTimer = CFG.boat.moorDur;
+          Sim._spawnAnchor(state, b.x, CFG.world.waterTop - 6);
+        }
+      } else if (b.state === "moored") {
+        b.moorTimer -= dt;
+        if (b.moorTimer <= 0) b.state = "leaving";
+      } else if (b.state === "leaving") {
+        b.x += b.vx * dt;
       }
     }
     // Cull once fully off-screen left.
@@ -820,12 +846,24 @@ export const Sim = {
     const C = CFG.coffin;
     state.coffins = state.coffins.filter((cf) => (state.t - cf.spawnT) < C.lifetime);
 
-    // --- move anchors (straight-down drop) ---
+    // --- anchors fall; when the crown touches the seabed they EMBED and
+    //     stay there for a couple of seconds before being culled. ---
+    const embedY = W.waterBottom - A.embedDepth;
     for (const a of state.anchors) {
-      a.y += a.vy * dt;
       if (a.splash > 0) a.splash = Math.max(0, a.splash - dt);
+      if (!a.embedded) {
+        a.y += a.vy * dt;
+        if (a.y >= embedY) {
+          a.y = embedY;
+          a.vy = 0;
+          a.embedded = true;
+          a.embeddedT = state.t;
+        }
+      }
     }
-    state.anchors = state.anchors.filter((a) => a.y < W.h + 40);
+    // Cull once the embedded linger is up. (Non-embedded anchors just above
+    // the world floor keep falling until they embed - they don't leave.)
+    state.anchors = state.anchors.filter((a) => !a.embedded || (state.t - a.embeddedT) < A.embedLinger);
 
     // --- move players (vertical dodging only; they hold their lane) ---
     for (const p of state.players) {

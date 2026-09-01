@@ -299,7 +299,8 @@
       "y": 96,
       "vx": -45,
       "targetX": 664.986195,
-      "dropped": false,
+      "state": "approaching",
+      "moorTimer": 0,
       "scale": 1
     }
   ],

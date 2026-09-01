@@ -526,41 +526,102 @@ export const Render = {
     const bodyR = E.bodyR * s;
     const B = el.buzz;
 
-    // Body path: sine-wave sampled points from head (left, since it swims
-    // right->left) to tail (right). Rendered as a thick round-cap stroke.
+    // Body path: sine-wave sampled points from HEAD at t=0 (leftmost - the
+    // eel swims right->left, so the head leads) to TAIL at t=1 (rightmost).
+    // The body tapers toward the head and the tail.
     const pts = [];
     for (let i = 0; i <= E.segments; i++) {
-      const t = i / E.segments;                       // 0 (head/left) -> 1 (tail/right)
+      const t = i / E.segments;
       const localX = -halfLen + t * (halfLen * 2);
-      const localY = Math.sin(el.swimT * 2.4 + t * 4.5 + el.wavePhase) * (el.waveAmp * s * (0.4 + 0.6 * (1 - Math.abs(t - 0.5) * 2)));
+      // Amplitude tapers off toward both ends so the head/tail sit "still".
+      const tapered = el.waveAmp * s * (0.4 + 0.6 * (1 - Math.abs(t - 0.5) * 2));
+      const localY = Math.sin(el.swimT * 2.4 + t * 4.5 + el.wavePhase) * tapered;
       pts.push({ x: el.x + localX, y: el.y + localY });
     }
+
+    // Body colours: dark blue-grey eel with a lighter belly. NOT yellow -
+    // that colour is reserved for the electricity FX.
+    const BODY_DARK = "#12262e";
+    const BODY_MID  = "#284452";
+    const BODY_HL   = "#3d6072";
+    const BELLY     = "#7c8890";
+
+    // Compute a "belly" polyline by offsetting each point downward.
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
     // Outer dark stroke
-    ctx.strokeStyle = "#1a2e0f"; ctx.lineWidth = bodyR * 2 + 2; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = BODY_DARK; ctx.lineWidth = bodyR * 2 + 2;
     ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.stroke();
-    // Body fill - yellow-green
-    ctx.strokeStyle = "#c5b04a"; ctx.lineWidth = bodyR * 2 - 1;
+    // Main body fill
+    ctx.strokeStyle = BODY_MID; ctx.lineWidth = bodyR * 2 - 1;
     ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.stroke();
-    // Darker back stripe along the top of the eel
-    ctx.strokeStyle = "#5a4a12"; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y - bodyR * 0.4);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y - bodyR * 0.4);
+    // Belly highlight (lower half only)
+    ctx.strokeStyle = BELLY; ctx.lineWidth = bodyR * 0.75;
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y + bodyR * 0.55);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y + bodyR * 0.55);
+    ctx.stroke();
+    // Back stripe along the top (darker)
+    ctx.strokeStyle = BODY_HL; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y - bodyR * 0.35);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y - bodyR * 0.35);
     ctx.stroke();
 
-    // Head details at the FRONT (leftmost point)
+    // ---- HEAD: a distinct tapered snout at the front (leftmost point).
+    // Draw it as a shape rather than relying on the round line-cap so it
+    // looks less circular and clearly reads as a head with an eye. ----
     const head = pts[0];
-    // Eye
+    const next = pts[1] || head;
+    const dx0 = head.x - next.x, dy0 = head.y - next.y;
+    const headAng = Math.atan2(dy0, dx0);   // pointing "forward" (leftish)
+    ctx.save();
+    ctx.translate(head.x, head.y);
+    ctx.rotate(headAng);
+    // Elongated tapered head (a pointy oval, longer than tall)
+    const headLen = bodyR * 3.2;
+    const headH   = bodyR * 1.4;
+    ctx.fillStyle = BODY_MID;
+    ctx.beginPath();
+    ctx.moveTo(headLen, 0);                                          // nose tip
+    ctx.quadraticCurveTo(headLen * 0.5, -headH,  0, -headH * 0.7);   // top curve
+    ctx.lineTo(-bodyR * 0.4, -bodyR * 0.5);                          // shoulder top
+    ctx.lineTo(-bodyR * 0.4,  bodyR * 0.5);                          // shoulder bottom
+    ctx.lineTo(0, headH * 0.7);                                      // bottom curve start
+    ctx.quadraticCurveTo(headLen * 0.5, headH, headLen, 0);          // bottom back to nose
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = BODY_DARK; ctx.lineWidth = 1.2; ctx.stroke();
+    // Top-of-head shadow for the tapered profile
+    ctx.fillStyle = BODY_DARK;
+    ctx.beginPath();
+    ctx.moveTo(headLen * 0.9, -0.2);
+    ctx.quadraticCurveTo(headLen * 0.5, -headH * 0.6, 0, -headH * 0.4);
+    ctx.lineTo(0, -headH * 0.15);
+    ctx.quadraticCurveTo(headLen * 0.4, -headH * 0.15, headLen * 0.9, -0.2);
+    ctx.closePath(); ctx.fill();
+    // Eye - clear white with a black pupil, positioned on top of the snout
+    const eyeX = headLen * 0.35;
+    const eyeY = -headH * 0.35;
     ctx.fillStyle = "#fff8e0";
-    ctx.beginPath(); ctx.arc(head.x + 2, head.y - 2, 1.6, 0, 7); ctx.fill();
-    ctx.fillStyle = "#0d141a";
-    ctx.beginPath(); ctx.arc(head.x + 2, head.y - 2, 0.9, 0, 7); ctx.fill();
-    // Mouth
-    ctx.strokeStyle = "#1a2e0f"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(head.x - 3, head.y + 1); ctx.lineTo(head.x + 1, head.y + 1); ctx.stroke();
+    ctx.beginPath(); ctx.arc(eyeX, eyeY, 2.1, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#0b1119"; ctx.lineWidth = 0.7; ctx.stroke();
+    ctx.fillStyle = "#0b1119";
+    ctx.beginPath(); ctx.arc(eyeX + 0.2, eyeY, 1.1, 0, 7); ctx.fill();
+    // Small mouth line along the underside of the snout
+    ctx.strokeStyle = "#0b1119"; ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(headLen * 0.55, headH * 0.35);
+    ctx.lineTo(headLen * 0.95, headH * 0.15);
+    ctx.stroke();
+    // Little gill slash behind the head
+    ctx.strokeStyle = BODY_DARK; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-bodyR * 0.1, -bodyR * 0.4);
+    ctx.lineTo(-bodyR * 0.1, bodyR * 0.4);
+    ctx.stroke();
+    ctx.restore();
 
     // Electric BUZZ rendering. The visible aura + bolts are the kill zone.
     if (B.state === "windup") {
@@ -615,19 +676,35 @@ export const Render = {
     }
   },
 
-  drawAnchor(ctx, a, frame) {
+  drawAnchor(ctx, a, state) {
     const s = a.scale;
     const W = CFG.world;
+    const A = CFG.anchor;
+    const frame = state.frame;
 
-    // Chain: straight vertical line from the anchor's ring up to the surface.
-    // Represents the length of chain paid out from the boat that dropped it.
-    const chainTop = W.waterTop;
-    const ringWorldY = a.y - 18 * s;   // ring position in world coords (matches art below)
-    if (ringWorldY > chainTop) {
-      ctx.strokeStyle = "#2a2016"; ctx.lineWidth = 2.5;
-      ctx.setLineDash([4, 3]);
-      ctx.beginPath(); ctx.moveTo(a.x, chainTop); ctx.lineTo(a.x, ringWorldY); ctx.stroke();
-      ctx.setLineDash([]);
+    // Alpha fades over the last half-second of the embedded linger so the
+    // anchor disappears from the seabed gracefully.
+    let alpha = 1;
+    if (a.embedded && a.embeddedT != null) {
+      const age = state.t - a.embeddedT;
+      const fadeFrom = Math.max(0, A.embedLinger - 0.7);
+      if (age > fadeFrom) alpha = Math.max(0, 1 - (age - fadeFrom) / 0.7);
+    }
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // Chain: straight vertical line from the anchor's ring up to the surface
+    // - only drawn while the anchor is still in flight. Once embedded, the
+    // chain has served its purpose and disappears.
+    if (!a.embedded) {
+      const chainTop = W.waterTop;
+      const ringWorldY = a.y - 18 * s;   // ring position in world coords (matches art below)
+      if (ringWorldY > chainTop) {
+        ctx.strokeStyle = "#2a2016"; ctx.lineWidth = 2.5;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(a.x, chainTop); ctx.lineTo(a.x, ringWorldY); ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
 
     ctx.save();
@@ -677,17 +754,35 @@ export const Render = {
 
     ctx.restore();
 
-    // Surface splash right after the drop - a couple of white arcs above the
-    // water line so the entry has some visual punch.
+    // Surface splash right after the drop.
     if (a.splash > 0) {
-      const alpha = a.splash / 0.35;
-      ctx.fillStyle = "rgba(200,235,255," + (0.7 * alpha).toFixed(2) + ")";
+      const splashA = a.splash / 0.35;
+      ctx.fillStyle = "rgba(200,235,255," + (0.7 * splashA).toFixed(2) + ")";
       for (let i = -2; i <= 2; i++) {
         const px = a.x + i * 8;
         const py = W.waterTop - Math.abs(i) * 3;
         ctx.beginPath(); ctx.arc(px, py, 3, 0, 7); ctx.fill();
       }
     }
+
+    // Sand-puff kicked up when the anchor first embeds - fades over the first
+    // half second of the linger.
+    if (a.embedded && a.embeddedT != null) {
+      const puffAge = state.t - a.embeddedT;
+      if (puffAge < 0.6) {
+        const puffA = (1 - puffAge / 0.6) * 0.6;
+        ctx.fillStyle = "rgba(210,180,120," + puffA.toFixed(2) + ")";
+        for (let i = 0; i < 5; i++) {
+          const ang = (i / 5) * Math.PI + Math.PI;                     // ground-hugging arcs
+          const rr = 18 * s * (0.5 + puffAge * 1.6);
+          const px = a.x + Math.cos(ang) * rr;
+          const py = W.waterBottom + Math.sin(ang) * rr * 0.35;
+          ctx.beginPath(); ctx.arc(px, py, 3 + puffAge * 4, 0, 7); ctx.fill();
+        }
+      }
+    }
+
+    ctx.restore();   // matches the ctx.save() at the top of drawAnchor
   },
 
   drawBoat(ctx, b, state) {
@@ -1341,7 +1436,7 @@ export const Render = {
 
     // --- anchors (drawn in front so nothing overlaps the falling body) ---
     if (state.anchors) {
-      for (const a of state.anchors) Render.drawAnchor(ctx, a, state.frame);
+      for (const a of state.anchors) Render.drawAnchor(ctx, a, state);
     }
 
     // --- sharks + lasers ---
