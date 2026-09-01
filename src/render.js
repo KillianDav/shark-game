@@ -446,11 +446,15 @@ export const Render = {
     }
     ctx.closePath(); ctx.fill();
 
-    // Body (facing right toward the divers).
+    // Body: swims RIGHT->LEFT like the other hazards, so the head must be
+    // on the LEFT side. Flip the local frame horizontally so the head-on-
+    // right art below reads as head-on-left in world coords.
     ctx.save();
     ctx.translate(f.x, f.y);
+    ctx.scale(-1, 1);
 
-    // Slight tail fin at the back-left
+    // Slight tail fin at the back (drawn on the -X side in this flipped
+    // frame, which lands on the RIGHT of the world - the trailing tail).
     ctx.fillStyle = "#c74a2a";
     ctx.beginPath();
     ctx.moveTo(-bodyRX, 0);

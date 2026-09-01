@@ -147,7 +147,7 @@ export const CFG = {
     earliestT: 5,                            // enters early, still before sharks
     spawnMin: 12, spawnMax: 20,
     maxOnScreen: 1,
-    minSpeed: 80, maxSpeed: 130,             // faster than seabed scroll - clearly moving left
+    minSpeed: 105, maxSpeed: 160,            // clearly faster than the seabed scroll
     minY: 220, maxY: 560,
     scaleMin: 1.0, scaleMax: 1.25,
     bodyLen: 55,                             // half-length of the body along the swim axis
