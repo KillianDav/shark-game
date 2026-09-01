@@ -818,53 +818,102 @@ export const Render = {
     ctx.moveTo(-w / 2 + 12, h * 0.7); ctx.lineTo(w / 2 - 12, h * 0.7);
     ctx.stroke();
 
+    // ---- Above-water portion: a proper freeboard so the boat sits high
+    // ---- and clear of the water, not just a thin strip. ----
+    const freeboard = 30;              // height of the hull above the waterline
+    const deckTop  = -freeboard;
+
     // Waterline plank (a bright brown band right at the water level)
     ctx.fillStyle = "#7a4720";
     ctx.fillRect(-w / 2 + 3, -3, w - 6, 5);
     ctx.strokeStyle = "#3a2210"; ctx.lineWidth = 0.8;
     ctx.strokeRect(-w / 2 + 3, -3, w - 6, 5);
 
-    // Deck strip peeking above the water
+    // Bulwark (side of the hull above the waterline)
     ctx.fillStyle = "#8b5a2b";
-    ctx.fillRect(-w / 2 + 10, -9, w - 20, 6);
-    ctx.strokeStyle = "#4a2a10"; ctx.lineWidth = 0.8;
-    ctx.strokeRect(-w / 2 + 10, -9, w - 20, 6);
+    ctx.beginPath();
+    ctx.moveTo(-w / 2 + 4,        -2);              // waterline aft
+    ctx.lineTo(-w / 2 + 14, deckTop);               // sheer up to bow
+    ctx.lineTo( w / 2 - 14, deckTop);               // deck stern
+    ctx.lineTo( w / 2 - 4,        -2);              // waterline stern
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#4a2a10"; ctx.lineWidth = 1;
+    ctx.stroke();
+    // Hull plank grain lines
+    ctx.strokeStyle = "#5a3418"; ctx.lineWidth = 0.7;
+    for (let py = deckTop + 8; py < -4; py += 8) {
+      ctx.beginPath();
+      ctx.moveTo(-w / 2 + 6, py); ctx.lineTo(w / 2 - 6, py);
+      ctx.stroke();
+    }
 
-    // Small superstructure (bridge cabin) near the stern (right side, since
-    // the boat is heading LEFT, the stern is behind - visually on the right).
+    // Deck cap (the wooden top edge running the length of the boat)
+    ctx.fillStyle = "#a97442";
+    ctx.fillRect(-w / 2 + 14, deckTop - 2, w - 28, 3);
+    ctx.strokeStyle = "#4a2a10"; ctx.lineWidth = 0.7;
+    ctx.strokeRect(-w / 2 + 14, deckTop - 2, w - 28, 3);
+
+    // Bridge cabin near the stern (right side, since boat heads LEFT)
+    const cabinX = w * 0.16, cabinW = w * 0.20;
+    const cabinTop = deckTop - 20;
     ctx.fillStyle = "#c4a670";
-    ctx.fillRect(w * 0.20, -20, w * 0.16, 11);
+    ctx.fillRect(cabinX, cabinTop, cabinW, 20);
     ctx.strokeStyle = "#4a3520"; ctx.lineWidth = 0.9;
-    ctx.strokeRect(w * 0.20, -20, w * 0.16, 11);
+    ctx.strokeRect(cabinX, cabinTop, cabinW, 20);
     // Cabin windows
     ctx.fillStyle = "#152a3a";
     for (let i = 0; i < 3; i++) {
-      ctx.fillRect(w * 0.20 + 4 + i * (w * 0.16 - 8) / 3, -17, 5, 4);
+      ctx.fillRect(cabinX + 5 + i * (cabinW - 10) / 3, cabinTop + 5, 6, 6);
     }
-    // Little chimney stack
+    // Little chimney stack on top of the cabin
+    const stackX = cabinX + cabinW * 0.55;
+    const stackTop = cabinTop - 12;
     ctx.fillStyle = "#2a1a10";
-    ctx.fillRect(w * 0.28, -26, 5, 7);
-    // Puff of smoke
+    ctx.fillRect(stackX, stackTop, 7, 12);
+    ctx.strokeStyle = "#0f0805"; ctx.lineWidth = 0.7;
+    ctx.strokeRect(stackX, stackTop, 7, 12);
+    ctx.fillStyle = "#c74a2a";
+    ctx.fillRect(stackX, stackTop + 2, 7, 2.5);
+    // Puff of smoke rising from the chimney
     ctx.fillStyle = "rgba(230,230,230,0.55)";
-    const smokeShift = (state.frame * 0.3) % 12;
-    ctx.beginPath(); ctx.arc(w * 0.31 - smokeShift, -30 - smokeShift * 0.4, 3, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(w * 0.29 - smokeShift * 0.6, -34 - smokeShift * 0.3, 2.4, 0, 7); ctx.fill();
+    const smokeShift = (state.frame * 0.3) % 14;
+    ctx.beginPath(); ctx.arc(stackX + 3.5 - smokeShift * 0.7, stackTop - 4 - smokeShift * 0.6, 3.5, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(stackX + 3.5 - smokeShift * 1.1, stackTop - 10 - smokeShift * 0.4, 3, 0, 7); ctx.fill();
 
-    // Anchor winch + capstan near the bow (left side - where the anchor
-    // deploys as the boat moves left over its target).
+    // Mast + flag near the bow (left side)
+    ctx.strokeStyle = "#2a1a10"; ctx.lineWidth = 1.2;
+    const mastX = -w * 0.25;
+    const mastTop = deckTop - 22;
+    ctx.beginPath(); ctx.moveTo(mastX, deckTop); ctx.lineTo(mastX, mastTop); ctx.stroke();
+    // Flag
+    ctx.fillStyle = "#c74a2a";
+    ctx.beginPath();
+    ctx.moveTo(mastX, mastTop);
+    ctx.lineTo(mastX - 10, mastTop + 4);
+    ctx.lineTo(mastX, mastTop + 8);
+    ctx.closePath(); ctx.fill();
+
+    // Anchor winch + capstan on the deck near the bow (left side - where
+    // the anchor deploys as the boat moves left over its target).
     ctx.fillStyle = "#3a2f22";
-    ctx.fillRect(-w * 0.35, -14, 12, 5);
+    ctx.fillRect(-w * 0.38, deckTop - 6, 14, 6);
     ctx.fillStyle = "#6b6558";
-    ctx.beginPath(); ctx.arc(-w * 0.33, -12, 3, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(-w * 0.36, deckTop - 4, 3.5, 0, 7); ctx.fill();
     ctx.strokeStyle = "#1a1510"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(-w * 0.33, -12, 3, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-w * 0.36, deckTop - 4, 3.5, 0, 7); ctx.stroke();
 
-    // Bow rail sticking up at the very front (left)
+    // Bow railing at the very front (left) - a small guardrail on the deck
     ctx.strokeStyle = "#3a2210"; ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.moveTo(-w / 2 + 8, -8);
-    ctx.lineTo(-w / 2 + 12, -12);
-    ctx.lineTo(-w / 2 + 22, -12);
+    ctx.moveTo(-w / 2 + 14, deckTop);
+    ctx.lineTo(-w / 2 + 14, deckTop - 6);
+    ctx.lineTo(-w / 2 + 30, deckTop - 6);
+    ctx.lineTo(-w / 2 + 30, deckTop);
+    ctx.stroke();
+    // Vertical rail posts
+    ctx.beginPath();
+    ctx.moveTo(-w / 2 + 20, deckTop); ctx.lineTo(-w / 2 + 20, deckTop - 6);
+    ctx.moveTo(-w / 2 + 24, deckTop); ctx.lineTo(-w / 2 + 24, deckTop - 6);
     ctx.stroke();
 
     ctx.restore();
