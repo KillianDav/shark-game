@@ -193,8 +193,9 @@ If you change `Sim` behaviour, `test/fixtures/golden-state.json` will fail. That
 ## Quick map (where to find things)
 
 - **Tunables** — `CFG` at the top of `src/sim.js`.
-- **Sim** — `src/sim.js`: `DIFFICULTIES`, `createState`, `step`, `_spawnShark`, `_spawnStingray`, `_spawnBoat`, `_spawnAnchor`, `_stingTip`, `_botIntent`, `_resolveWinner`, `_difficulty(state, t)`, `_speedMul(state, t)`, `_spawnInterval(state, t)`, `_eye`, `_kill`, `_dropCoffin`.
-- **Render** — `src/render.js`: `drawSharkSprite`, `drawSharkLaser`, `drawWindupCharge`, `drawStingray`, `drawBoat`, `drawAnchor`, `drawPlayer` (scuba diver), `drawCoffin`, `_waterColorAt`, `_buildSeabed`, `drawSeabed`, `drawState`.
+- **Sim** — `src/sim.js`: `DIFFICULTIES`, `createState`, `step`, `_spawnShark`, `_spawnStingray`, `_spawnOctopus`, `_spawnLionfish`, `_spawnBoat`, `_spawnAnchor`, `_stingTip`, `_octopusTip(o, i)`, `_lionfishTip(f, i)`, `_botIntent`, `_resolveWinner`, `_difficulty(state, t)`, `_speedMul(state, t)`, `_spawnInterval(state, t)`, `_eye`, `_kill`, `_dropCoffin`.
+- **Render** — `src/render.js`: `drawSharkSprite`, `drawSharkLaser`, `drawWindupCharge`, `drawStingray`, `drawOctopus`, `drawLionfish`, `drawBoat`, `drawAnchor`, `drawPlayer` (scuba diver), `drawCoffin`, `_waterColorAt`, `_buildSeabed`, `drawSeabed`, `drawState`.
+- **Multi-tip hazards (`octopus`, `lionfish`):** each has N kill zones at once. `Sim._octopusTip(o, i)` and `Sim._lionfishTip(f, i)` return the world-space tip position for tentacle/spike `i`; both collision (`Sim.step`) and rendering (`Render.drawOctopus` / `drawLionfish`) read from the same helper so they can't drift. Bodies are safe to touch - only the small visible tip circles (`CFG.octopus.tipR`, `CFG.lionfish.tipR`) kill.
 - **Boat -> anchor flow:** `anchorSpawnTimer` now spawns a `boat` (crossing the surface at `CFG.boat.speed`) instead of an anchor directly. Each boat picks a `targetX` in the `CFG.anchor.dropMinX..dropMaxX` band. When `boat.x <= targetX`, the boat releases an anchor via `_spawnAnchor(state, x, y)` and marks itself `dropped`. Anchors trail a visible chain from their ring up to `waterTop` (rendered in `drawAnchor`).
 - **Input** — `src/input.js`: key map, `attach` / `detach` / `intent` / `reset`.
 - **LocalTransport** — `src/transport-local.js`: in-tab sim.

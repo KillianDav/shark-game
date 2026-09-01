@@ -1,11 +1,13 @@
 # Standup Shark
 
 A stand-up picker game. Your team of **scuba divers** dodges the laser-eyed
-sharks, the tail-whipping stingrays, and the occasional anchor a passing
-boat drops through the water — the **winner runs the next standup**. Only
-the **dangerous parts** kill: shark **teeth**, the **laser beam**, the
-**stingray sting circle** (the visible glow), and a direct **anchor** body
-hit. Control your diver with the **up / down arrow keys** (W / S also work).
+sharks, tail-whipping stingrays, hovering **blue-ringed octopuses**, spike-
+fanning **lionfish**, and the occasional anchor a passing boat drops through
+the water — the **winner runs the next standup**. Only the **dangerous
+parts** kill: shark **teeth**, the **laser beam**, the **stingray sting
+circle**, the **octopus's blue rings** at each tentacle tip, the **lionfish
+spike tips**, and a direct **anchor** body hit. Control your diver with the
+**up / down arrow keys** (W / S also work).
 
 The shark art (and the laser-eye rendering) is ported from the reference
 `standup-lemmings/index-shark.html` game.

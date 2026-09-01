@@ -158,6 +158,8 @@ function endGame(state) {
     const spd = Sim._speedMul(state, survived).toFixed(2);
     const how = winner && winner.deathKind === "laser" ? "lasered"
               : winner && winner.deathKind === "stung" ? "stung by a ray"
+              : winner && winner.deathKind === "octopus" ? "zapped by a blue-ring"
+              : winner && winner.deathKind === "lionfish" ? "spiked by a lionfish"
               : winner && winner.deathKind === "anchor" ? "anchored"
               : "eaten";
     els.resultLead.textContent = "You survived";

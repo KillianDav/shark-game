@@ -34,8 +34,10 @@ export const CFG = {
   },
   shark: {
     minSpeed: 175, maxSpeed: 285,
-    spawnStart: 2.0,   // seconds between spawns at t=0 (few sharks to start)
-    spawnMin: 0.26,    // fastest spawn interval late-game (dense swarm)
+    // Sharks are now sparser: octopuses and lionfish share the hazard budget
+    // so the ocean doesn't become a shark-only wall.
+    spawnStart: 3.5,   // seconds between spawns at t=0
+    spawnMin: 0.55,    // fastest spawn interval late-game
     rampTime: 26,      // seconds to reach peak difficulty (steep, front-loaded)
     rampEase: 0.6,     // <1 front-loads the ramp so it gets hard fast
     minY: 120, maxY: 678,   // reaches the full swimmer range - no safe top/bottom corner
@@ -90,6 +92,38 @@ export const CFG = {
     fadeStart: 1.6,         // seconds from spawn before fading begins
     lifetime: 2.5           // seconds after spawn until the coffin is culled
   },
+  octopus: {
+    // Blue-ringed octopus: hovers mid-water with 8 wavy tentacles. Only the
+    // small blue-ring circles at the tentacle TIPS kill - the mantle body is
+    // safe to touch. Slow drifter; a steady lurking hazard rather than a
+    // fast threat like the sharks.
+    earliestT: 14,
+    spawnMin: 10, spawnMax: 16,
+    maxOnScreen: 2,
+    minSpeed: 22, maxSpeed: 42,           // slow leftward drift
+    minY: 200, maxY: 560,                  // mid-water; avoids the seabed floor
+    scaleMin: 1.05, scaleMax: 1.3,
+    bodyR: 18,                             // mantle radius (cosmetic)
+    tentacleLen: 40,                       // distance from centre to tip
+    tentacles: 8,
+    tipR: 12,                              // kill radius of each blue-ring stinger
+    swayAmp: 0.15                          // radians of tentacle sway per cycle
+  },
+  lionfish: {
+    // Lionfish: hovers with a fan of long venomous spikes. Only the small
+    // hazard tips at the end of each spike kill - the body is safe to touch.
+    earliestT: 18,
+    spawnMin: 11, spawnMax: 19,
+    maxOnScreen: 2,
+    minSpeed: 30, maxSpeed: 55,
+    minY: 180, maxY: 560,
+    scaleMin: 1.0, scaleMax: 1.35,
+    bodyRX: 20, bodyRY: 10,               // body ellipse (cosmetic)
+    spikes: 9,                             // radiating fin rays
+    spikeLen: 32,                          // length from body edge to tip
+    tipR: 8,                               // kill radius of each spike-tip hazard
+    swayAmp: 0.08
+  },
   anchor: {
     // Rare falling anchor, preceded by a boat visibly crossing the water
     // surface. The boat picks a mid-screen drop point so the player sees the
@@ -131,12 +165,14 @@ export const DIFFICULTIES = {
   easy: {
     label: "Easy",
     shark: {
-      spawnStart: 3.0, spawnMin: 0.55,
+      spawnStart: 4.5, spawnMin: 0.9,
       rampTime: 36, rampEase: 0.75,
       laserChance: 0.38, laserCooldownMin: 1.8, laserCooldownMax: 4.0,
       sizeStepPerTier: 0.13, tierSeconds: 20, scaleCap: 3.0
     },
-    stingray: { earliestT: 8, spawnMin: 6.5, spawnMax: 11, maxOnScreen: 1 },
+    stingray: { earliestT: 10, spawnMin: 8, spawnMax: 13, maxOnScreen: 1 },
+    octopus:  { earliestT: 18, spawnMin: 14, spawnMax: 22, maxOnScreen: 1 },
+    lionfish: { earliestT: 22, spawnMin: 16, spawnMax: 26, maxOnScreen: 1 },
     anchor:   { earliestT: 20, spawnMin: 14, spawnMax: 24 },
     progression: { speedPerSec: 0.013, speedMax: 2.0 }
   },
@@ -147,12 +183,14 @@ export const DIFFICULTIES = {
   fiendish: {
     label: "Fiendish",
     shark: {
-      spawnStart: 1.2, spawnMin: 0.18,
+      spawnStart: 2.2, spawnMin: 0.32,
       rampTime: 18, rampEase: 0.5,
       laserChance: 0.75, laserCooldownMin: 0.8, laserCooldownMax: 2.0,
       sizeStepPerTier: 0.22, tierSeconds: 10, scaleCap: 3.8
     },
     stingray: { earliestT: 3, spawnMin: 3.0, spawnMax: 5.0, maxOnScreen: 3 },
+    octopus:  { earliestT: 6, spawnMin: 6, spawnMax: 10, maxOnScreen: 3 },
+    lionfish: { earliestT: 8, spawnMin: 6.5, spawnMax: 11, maxOnScreen: 3 },
     anchor:   { earliestT: 8,  spawnMin: 5,  spawnMax: 11 },
     progression: { speedPerSec: 0.028, speedMax: 3.0 }
   }
@@ -166,6 +204,8 @@ function _resolveDiff(name) {
   return {
     shark:       { ...CFG.shark,       ...(preset.shark       || {}) },
     stingray:    { ...CFG.stingray,    ...(preset.stingray    || {}) },
+    octopus:     { ...CFG.octopus,     ...(preset.octopus     || {}) },
+    lionfish:    { ...CFG.lionfish,    ...(preset.lionfish    || {}) },
     anchor:      { ...CFG.anchor,      ...(preset.anchor      || {}) },
     progression: { ...CFG.progression, ...(preset.progression || {}) }
   };
@@ -230,17 +270,23 @@ export const Sim = {
       players,
       sharks: [],
       stingrays: [],
+      octopuses: [],
+      lionfish: [],
       boats: [],
       anchors: [],
       coffins: [],
       nextSharkId: 1,
       nextStingrayId: 1,
+      nextOctopusId: 1,
+      nextLionfishId: 1,
       nextBoatId: 1,
       nextAnchorId: 1,
       nextCoffinId: 1,
-      spawnTimer: 0.8,                          // shark spawn cadence
-      raySpawnTimer: diff.stingray.earliestT,   // first ray no earlier than earliestT
-      anchorSpawnTimer: diff.anchor.earliestT,  // first anchor no earlier than earliestT
+      spawnTimer: 0.8,                             // shark spawn cadence
+      raySpawnTimer:      diff.stingray.earliestT, // first ray no earlier than earliestT
+      octopusSpawnTimer:  diff.octopus.earliestT,  // first octopus no earlier than earliestT
+      lionfishSpawnTimer: diff.lionfish.earliestT, // first lionfish no earlier than earliestT
+      anchorSpawnTimer:   diff.anchor.earliestT,   // first anchor no earlier than earliestT
       winnerId: null
     };
   },
@@ -359,6 +405,58 @@ export const Sim = {
     });
   },
 
+  _spawnOctopus(state) {
+    const O = state.diff.octopus, rng = state.rng, W = CFG.world;
+    const speed = lerp(O.minSpeed, O.maxSpeed, rng()) * Sim._speedMul(state, state.t);
+    const scale = lerp(O.scaleMin, O.scaleMax, rng());
+    const baseY = lerp(O.minY, O.maxY, rng());
+    state.octopuses.push({
+      id: state.nextOctopusId++,
+      x: W.w + O.bodyR * scale + 20,
+      y: baseY, baseY,
+      vx: -speed,
+      swimT: rng() * 10,
+      wavePhase: rng() * Math.PI * 2,
+      scale
+    });
+  },
+
+  _spawnLionfish(state) {
+    const L = state.diff.lionfish, rng = state.rng, W = CFG.world;
+    const speed = lerp(L.minSpeed, L.maxSpeed, rng()) * Sim._speedMul(state, state.t);
+    const scale = lerp(L.scaleMin, L.scaleMax, rng());
+    const baseY = lerp(L.minY, L.maxY, rng());
+    state.lionfish.push({
+      id: state.nextLionfishId++,
+      x: W.w + L.bodyRX * scale + 20,
+      y: baseY, baseY,
+      vx: -speed,
+      swimT: rng() * 10,
+      wavePhase: rng() * Math.PI * 2,
+      scale
+    });
+  },
+
+  // Blue-ring stinger position at tentacle i. Used by both collision and
+  // renderer so they can't drift out of sync.
+  _octopusTip(o, i) {
+    const O = CFG.octopus;
+    const angle = (i / O.tentacles) * Math.PI * 2
+                + Math.sin(o.swimT * 1.6 + i * 0.7 + o.wavePhase) * O.swayAmp;
+    const len = O.tentacleLen * o.scale;
+    return { x: o.x + Math.cos(angle) * len, y: o.y + Math.sin(angle) * len };
+  },
+
+  // Hazard-tip position at lionfish spike i. Spikes fan out radially with a
+  // subtle sway; the tip is where the venom "hazard" lives.
+  _lionfishTip(l, i) {
+    const L = CFG.lionfish;
+    const angle = (i / L.spikes) * Math.PI * 2
+                + Math.sin(l.swimT * 1.2 + i * 0.5 + l.wavePhase) * L.swayAmp;
+    const len = (L.bodyRX + L.spikeLen) * l.scale;
+    return { x: l.x + Math.cos(angle) * len, y: l.y + Math.sin(angle) * len };
+  },
+
   _spawnAnchor(state, x, y) {
     const A = state.diff.anchor, rng = state.rng;
     const vy = lerp(A.minSpeed, A.maxSpeed, rng()) * Sim._speedMul(state, state.t);
@@ -408,6 +506,29 @@ export const Sim = {
       const dxa = Math.abs(a.x - p.x);
       if (dxa < best) { best = dxa; threatY = a.y; }
     }
+    // Octopus stingers: each blue-ring tip is a threat point. Use the nearest
+    // tip in x that's within detect range as the y to steer away from.
+    for (const o of state.octopuses) {
+      const dxo = o.x - p.x;
+      if (dxo < -40 || dxo > detect) continue;
+      const oCfg = CFG.octopus;
+      for (let i = 0; i < oCfg.tentacles; i++) {
+        const tip = Sim._octopusTip(o, i);
+        const dxt = Math.abs(tip.x - p.x);
+        if (dxt < best) { best = dxt; threatY = tip.y; }
+      }
+    }
+    // Lionfish spike tips: same treatment.
+    for (const f of state.lionfish) {
+      const dxf = f.x - p.x;
+      if (dxf < -40 || dxf > detect) continue;
+      const lCfg = CFG.lionfish;
+      for (let i = 0; i < lCfg.spikes; i++) {
+        const tip = Sim._lionfishTip(f, i);
+        const dxt = Math.abs(tip.x - p.x);
+        if (dxt < best) { best = dxt; threatY = tip.y; }
+      }
+    }
     if (threatY == null) {
       // drift gently toward vertical centre
       const mid = (CFG.world.waterTop + CFG.world.waterBottom) / 2;
@@ -424,6 +545,7 @@ export const Sim = {
     if (state.status === "over") return state;
     const W = CFG.world, P = CFG.player;
     const S = state.diff.shark, R = state.diff.stingray, A = state.diff.anchor;
+    const O = state.diff.octopus, L = state.diff.lionfish;
     state.t += dt;
     state.frame++;
     const m = Sim._speedMul(state, state.t);   // shared tempo: players get faster with the sharks
@@ -445,6 +567,28 @@ export const Sim = {
       } else if (state.raySpawnTimer <= 0) {
         // At the cap - retry soon so the timer doesn't stack up huge deficits.
         state.raySpawnTimer = 0.6;
+      }
+    }
+
+    // --- spawn blue-ringed octopuses on their own timer (cap on screen) ---
+    if (state.hazards !== "sharks-only" && state.t >= O.earliestT) {
+      state.octopusSpawnTimer -= dt;
+      if (state.octopusSpawnTimer <= 0 && state.octopuses.length < O.maxOnScreen) {
+        Sim._spawnOctopus(state);
+        state.octopusSpawnTimer = lerp(O.spawnMin, O.spawnMax, state.rng());
+      } else if (state.octopusSpawnTimer <= 0) {
+        state.octopusSpawnTimer = 0.6;
+      }
+    }
+
+    // --- spawn lionfish on their own timer (cap on screen) ---
+    if (state.hazards !== "sharks-only" && state.t >= L.earliestT) {
+      state.lionfishSpawnTimer -= dt;
+      if (state.lionfishSpawnTimer <= 0 && state.lionfish.length < L.maxOnScreen) {
+        Sim._spawnLionfish(state);
+        state.lionfishSpawnTimer = lerp(L.spawnMin, L.spawnMax, state.rng());
+      } else if (state.lionfishSpawnTimer <= 0) {
+        state.lionfishSpawnTimer = 0.6;
       }
     }
 
@@ -515,6 +659,22 @@ export const Sim = {
     }
     state.stingrays = state.stingrays.filter((r) => r.x > -80);
 
+    // --- move octopuses (slow drift + gentle vertical bob) ---
+    for (const o of state.octopuses) {
+      o.x += o.vx * dt;
+      o.swimT += dt;
+      o.y = clamp(o.baseY + Math.sin(o.swimT * 0.8 + o.wavePhase) * 8, O.minY, O.maxY);
+    }
+    state.octopuses = state.octopuses.filter((o) => o.x > -60);
+
+    // --- move lionfish (drift + slight bob) ---
+    for (const f of state.lionfish) {
+      f.x += f.vx * dt;
+      f.swimT += dt;
+      f.y = clamp(f.baseY + Math.sin(f.swimT * 0.9 + f.wavePhase) * 6, L.minY, L.maxY);
+    }
+    state.lionfish = state.lionfish.filter((f) => f.x > -60);
+
     // --- coffins stay put at the death spot and cull after their lifetime ---
     const C = CFG.coffin;
     state.coffins = state.coffins.filter((cf) => (state.t - cf.spawnT) < C.lifetime);
@@ -566,6 +726,43 @@ export const Sim = {
         const ex = tip.x - (p.x + bx), ey = tip.y - (p.y + by);
         if (ex * ex + ey * ey <= R.stingReach * R.stingReach) {
           Sim._kill(state, p, "stung", tip.x, tip.y);
+        }
+      }
+    }
+
+    // --- octopus blue-ring stingers: only the TIP circles kill (8 per octopus). ---
+    for (const o of state.octopuses) {
+      const tipRSq = O.tipR * O.tipR;
+      for (let i = 0; i < O.tentacles; i++) {
+        const tip = Sim._octopusTip(o, i);
+        for (const p of state.players) {
+          if (!p.alive) continue;
+          // Same circle-vs-ellipse test used by the stingray strike.
+          const dx = tip.x - p.x, dy = tip.y - p.y;
+          const nx = dx / P.rx, ny = dy / P.ry;
+          const d = Math.sqrt(nx * nx + ny * ny);
+          if (d <= 1) { Sim._kill(state, p, "octopus", tip.x, tip.y); continue; }
+          const bx = (nx / d) * P.rx, by = (ny / d) * P.ry;
+          const ex = tip.x - (p.x + bx), ey = tip.y - (p.y + by);
+          if (ex * ex + ey * ey <= tipRSq) Sim._kill(state, p, "octopus", tip.x, tip.y);
+        }
+      }
+    }
+
+    // --- lionfish spikes: only the small TIP hazards kill (one per spike). ---
+    for (const f of state.lionfish) {
+      const tipRSq = L.tipR * L.tipR;
+      for (let i = 0; i < L.spikes; i++) {
+        const tip = Sim._lionfishTip(f, i);
+        for (const p of state.players) {
+          if (!p.alive) continue;
+          const dx = tip.x - p.x, dy = tip.y - p.y;
+          const nx = dx / P.rx, ny = dy / P.ry;
+          const d = Math.sqrt(nx * nx + ny * ny);
+          if (d <= 1) { Sim._kill(state, p, "lionfish", tip.x, tip.y); continue; }
+          const bx = (nx / d) * P.rx, by = (ny / d) * P.ry;
+          const ex = tip.x - (p.x + bx), ey = tip.y - (p.y + by);
+          if (ex * ex + ey * ey <= tipRSq) Sim._kill(state, p, "lionfish", tip.x, tip.y);
         }
       }
     }

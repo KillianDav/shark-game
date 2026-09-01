@@ -312,6 +312,175 @@ export const Render = {
     ctx.restore();
   },
 
+  drawOctopus(ctx, o, frame) {
+    const O = CFG.octopus;
+    const s = o.scale;
+    const bodyR = O.bodyR * s;
+    const tipR = O.tipR;   // rendered at world scale so the kill circle matches the visible ring
+
+    ctx.save();
+    ctx.translate(o.x, o.y);
+
+    // Tentacles: each is a bezier curve from just inside the body to the tip.
+    // The tip position uses Sim._octopusTip so collision and art stay in sync.
+    ctx.strokeStyle = "#5a1c3e";
+    ctx.lineWidth = 3.5 * s;
+    ctx.lineCap = "round";
+    for (let i = 0; i < O.tentacles; i++) {
+      const tip = Sim._octopusTip(o, i);
+      const tx = tip.x - o.x, ty = tip.y - o.y;
+      // Root just outside the body at the same angle
+      const ang = Math.atan2(ty, tx);
+      const rx = Math.cos(ang) * bodyR * 0.55;
+      const ry = Math.sin(ang) * bodyR * 0.55;
+      // Curve control offset perpendicular to the tentacle for a lazy S-shape
+      const perpX = -Math.sin(ang), perpY = Math.cos(ang);
+      const wave = Math.sin(o.swimT * 2.4 + i * 0.9 + o.wavePhase) * 6 * s;
+      const cx1 = (rx + tx) * 0.5 + perpX * wave;
+      const cy1 = (ry + ty) * 0.5 + perpY * wave;
+      ctx.beginPath();
+      ctx.moveTo(rx, ry);
+      ctx.quadraticCurveTo(cx1, cy1, tx, ty);
+      ctx.stroke();
+    }
+    // Inner lighter tentacle stripe for a bit of depth
+    ctx.strokeStyle = "#7a2e5c";
+    ctx.lineWidth = 1.8 * s;
+    for (let i = 0; i < O.tentacles; i++) {
+      const tip = Sim._octopusTip(o, i);
+      const tx = tip.x - o.x, ty = tip.y - o.y;
+      const ang = Math.atan2(ty, tx);
+      const rx = Math.cos(ang) * bodyR * 0.55;
+      const ry = Math.sin(ang) * bodyR * 0.55;
+      const perpX = -Math.sin(ang), perpY = Math.cos(ang);
+      const wave = Math.sin(o.swimT * 2.4 + i * 0.9 + o.wavePhase) * 6 * s;
+      const cx1 = (rx + tx) * 0.5 + perpX * wave;
+      const cy1 = (ry + ty) * 0.5 + perpY * wave;
+      ctx.beginPath();
+      ctx.moveTo(rx, ry);
+      ctx.quadraticCurveTo(cx1, cy1, tx, ty);
+      ctx.stroke();
+    }
+
+    // Mantle (bulbous body) - purple/burgundy with a highlight.
+    ctx.fillStyle = "#5a1c3e";
+    ctx.beginPath(); ctx.ellipse(0, -2, bodyR, bodyR * 0.95, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#3a0f28"; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = "#7a2e5c";
+    ctx.beginPath(); ctx.ellipse(-2, -6, bodyR * 0.6, bodyR * 0.35, 0, 0, 7); ctx.fill();
+
+    // Blue ring pattern on the mantle (mimics the real animal)
+    ctx.fillStyle = "#3af0ff";
+    ctx.strokeStyle = "#0a3d8a"; ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+      const ang = i * 1.4 + o.wavePhase;
+      const rr = bodyR * 0.55;
+      const bx = Math.cos(ang) * rr * 0.7;
+      const by = Math.sin(ang) * rr * 0.7 - 2;
+      ctx.beginPath(); ctx.arc(bx, by, 2.2 * s, 0, 7); ctx.fill(); ctx.stroke();
+    }
+
+    // Eyes
+    ctx.fillStyle = "#fff8e0";
+    ctx.beginPath(); ctx.ellipse(-4, -3, 2.2, 1.6, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(4, -3, 2.2, 1.6, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = "#0d141a";
+    ctx.beginPath(); ctx.arc(-4, -3, 1, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(4, -3, 1, 0, 7); ctx.fill();
+
+    ctx.restore();
+
+    // Blue-ring stingers at each tentacle tip - drawn last, in world coords,
+    // so the glow overlays the tentacle end. The circle IS the kill zone.
+    for (let i = 0; i < O.tentacles; i++) {
+      const tip = Sim._octopusTip(o, i);
+      // Soft glow halo
+      ctx.fillStyle = "rgba(58,240,255,0.35)";
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR, 0, 7); ctx.fill();
+      // Blue ring
+      ctx.strokeStyle = "#0a3d8a"; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR * 0.55, 0, 7); ctx.stroke();
+      ctx.fillStyle = "#3af0ff";
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR * 0.35, 0, 7); ctx.fill();
+    }
+  },
+
+  drawLionfish(ctx, f, frame) {
+    const L = CFG.lionfish;
+    const s = f.scale;
+    const bodyRX = L.bodyRX * s;
+    const bodyRY = L.bodyRY * s;
+    const tipR = L.tipR;
+
+    ctx.save();
+    ctx.translate(f.x, f.y);
+
+    // Spikes: long thin rays fanning out radially. Same tip helper as
+    // collision so what you see IS what kills.
+    ctx.strokeStyle = "#4a1a10";
+    ctx.lineWidth = 1.8 * s;
+    ctx.lineCap = "round";
+    for (let i = 0; i < L.spikes; i++) {
+      const tip = Sim._lionfishTip(f, i);
+      const tx = tip.x - f.x, ty = tip.y - f.y;
+      const ang = Math.atan2(ty, tx);
+      const rx = Math.cos(ang) * bodyRX * 0.9;
+      const ry = Math.sin(ang) * bodyRY * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(rx, ry);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+    }
+    // Translucent fin membrane between adjacent spikes for a fan look
+    ctx.fillStyle = "rgba(212,64,42,0.28)";
+    ctx.beginPath();
+    for (let i = 0; i < L.spikes; i++) {
+      const tip = Sim._lionfishTip(f, i);
+      const tx = tip.x - f.x, ty = tip.y - f.y;
+      if (i === 0) ctx.moveTo(tx * 0.85, ty * 0.85);
+      else ctx.lineTo(tx * 0.85, ty * 0.85);
+    }
+    ctx.closePath(); ctx.fill();
+
+    // Body: horizontal ellipse with red/white cartoon bands.
+    ctx.fillStyle = "#f0e8d8";
+    ctx.beginPath(); ctx.ellipse(0, 0, bodyRX, bodyRY, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = "#2f1810"; ctx.lineWidth = 1; ctx.stroke();
+    // Warning stripes
+    ctx.fillStyle = "#d4402a";
+    for (const bx of [-bodyRX * 0.55, -bodyRX * 0.15, bodyRX * 0.3]) {
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(0, 0, bodyRX, bodyRY, 0, 0, 7); ctx.clip();
+      ctx.fillRect(bx - 2 * s, -bodyRY - 1, 4 * s, bodyRY * 2 + 2);
+      ctx.restore();
+    }
+
+    // Head - a small skin-tone patch at the front (right, since it faces the
+    // players' lane); eye + tiny mouth for cartoon face.
+    ctx.fillStyle = "#e4b090";
+    ctx.beginPath(); ctx.arc(bodyRX * 0.72, -1, bodyRY * 0.55, 0, 7); ctx.fill();
+    ctx.fillStyle = "#0d141a";
+    ctx.beginPath(); ctx.arc(bodyRX * 0.82, -2, 1.4, 0, 7); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(bodyRX * 0.82, -3, 0.9, 0.9);
+    // Tiny mouth
+    ctx.strokeStyle = "#4a1a10"; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(bodyRX * 0.95, 1); ctx.lineTo(bodyRX * 1.05, 1); ctx.stroke();
+
+    ctx.restore();
+
+    // Hazard tips at the end of each spike (world coords). Small warning dot.
+    for (let i = 0; i < L.spikes; i++) {
+      const tip = Sim._lionfishTip(f, i);
+      ctx.fillStyle = "rgba(255,224,102,0.45)";
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR, 0, 7); ctx.fill();
+      ctx.strokeStyle = "#3a2612"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR * 0.55, 0, 7); ctx.stroke();
+      ctx.fillStyle = "#ffe066";
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, tipR * 0.35, 0, 7); ctx.fill();
+    }
+  },
+
   drawAnchor(ctx, a, frame) {
     const s = a.scale;
     const W = CFG.world;
@@ -450,9 +619,10 @@ export const Render = {
         scale = 1 - t * 0.6;
         vaporSparks = true;
         showName = false;
-      } else if (p.deathKind === "stung") {
-        // Stung: quick electric flicker then shrink. Distinct from "eaten" so
-        // the player can tell what killed them.
+      } else if (p.deathKind === "stung" || p.deathKind === "octopus" || p.deathKind === "lionfish") {
+        // Stung / octopus tip / lionfish spike - all toxin-style deaths: a quick
+        // electric flicker then shrink. Distinct from "eaten" so the player can
+        // tell what killed them.
         const dur = CFG.fx.stingDur;
         if (age >= dur) return;
         const t = age / dur;
@@ -972,6 +1142,16 @@ export const Render = {
       for (const r of state.stingrays) Render.drawStingray(ctx, r, state.frame);
     }
 
+    // --- octopuses ---
+    if (state.octopuses) {
+      for (const o of state.octopuses) Render.drawOctopus(ctx, o, state.frame);
+    }
+
+    // --- lionfish ---
+    if (state.lionfish) {
+      for (const f of state.lionfish) Render.drawLionfish(ctx, f, state.frame);
+    }
+
     // --- anchors (drawn in front so nothing overlaps the falling body) ---
     if (state.anchors) {
       for (const a of state.anchors) Render.drawAnchor(ctx, a, state.frame);
@@ -1028,10 +1208,12 @@ export const Render = {
       const tier = Math.floor(state.t / state.diff.shark.tierSeconds) + 1;
       const spd = Sim._speedMul(state, state.t).toFixed(2);
       const rayCount = (state.stingrays && state.stingrays.length) || 0;
+      const octCount = (state.octopuses && state.octopuses.length) || 0;
+      const lionCount = (state.lionfish && state.lionfish.length) || 0;
       const anchorCount = (state.anchors && state.anchors.length) || 0;
       const hazardBit = state.hazards === "sharks-only"
         ? `sharks ${state.sharks.length}`
-        : `sharks ${state.sharks.length} \u2022 rays ${rayCount} \u2022 anchors ${anchorCount}`;
+        : `sharks ${state.sharks.length} \u2022 rays ${rayCount} \u2022 octo ${octCount} \u2022 lion ${lionCount} \u2022 anch ${anchorCount}`;
       ctx.font = "bold 16px 'Segoe UI', sans-serif";
       label(`Size tier ${tier}   \u2022   tempo x${spd}   \u2022   ${hazardBit}`, W.w - 16, "right");
     } else {
