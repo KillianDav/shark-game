@@ -117,9 +117,10 @@ export const CFG = {
     spreadMin: Math.PI * 0.18,             // lower-right
     spreadMax: Math.PI * 0.82,             // lower-left
     swayAmp: 0.14,
-    // Vertical drift path across the screen - a proper wavy line.
-    pathAmpMin: 22, pathAmpMax: 40,
-    pathFreqMin: 0.35, pathFreqMax: 0.65
+    // Vertical drift path across the screen - a proper wavy line, big enough
+    // to be obviously undulating rather than a subtle bob.
+    pathAmpMin: 55, pathAmpMax: 90,
+    pathFreqMin: 0.55, pathFreqMax: 1.0
   },
   lionfish: {
     // Lionfish: horizontal striped body with a fan of DORSAL SPIKES rising
@@ -144,8 +145,8 @@ export const CFG = {
     tiltAmp: 0.32,
     swayAmp: 0.06,
     // Vertical drift path - hazards vary their depth as they cross.
-    pathAmpMin: 18, pathAmpMax: 32,
-    pathFreqMin: 0.4, pathFreqMax: 0.75
+    pathAmpMin: 40, pathAmpMax: 70,
+    pathFreqMin: 0.55, pathFreqMax: 1.05
   },
   electricEel: {
     // Long slender eel that swims right-to-left, intermittently discharging
@@ -480,7 +481,11 @@ export const Sim = {
     const O = state.diff.octopus, rng = state.rng, W = CFG.world;
     const speed = lerp(O.minSpeed, O.maxSpeed, rng()) * Sim._speedMul(state, state.t);
     const scale = lerp(O.scaleMin, O.scaleMax, rng());
-    const baseY = lerp(O.minY, O.maxY, rng());
+    // Roll the wave AMPLITUDE first, then choose baseY inside a band that
+    // leaves room for the whole sine to swing without clipping the clamps.
+    const pathAmp  = lerp(O.pathAmpMin,  O.pathAmpMax,  rng());
+    const pathFreq = lerp(O.pathFreqMin, O.pathFreqMax, rng());
+    const baseY = lerp(O.minY + pathAmp, O.maxY - pathAmp, rng());
     state.octopuses.push({
       id: state.nextOctopusId++,
       x: W.w + O.bodyR * scale + 20,
@@ -488,9 +493,7 @@ export const Sim = {
       vx: -speed,
       swimT: rng() * 10,
       wavePhase: rng() * Math.PI * 2,
-      // Per-instance wavy drift path so each octopus varies its depth as it crosses.
-      pathAmp:  lerp(O.pathAmpMin,  O.pathAmpMax,  rng()),
-      pathFreq: lerp(O.pathFreqMin, O.pathFreqMax, rng()),
+      pathAmp, pathFreq,
       scale
     });
   },
@@ -499,7 +502,11 @@ export const Sim = {
     const L = state.diff.lionfish, rng = state.rng, W = CFG.world;
     const speed = lerp(L.minSpeed, L.maxSpeed, rng()) * Sim._speedMul(state, state.t);
     const scale = lerp(L.scaleMin, L.scaleMax, rng());
-    const baseY = lerp(L.minY, L.maxY, rng());
+    // Roll the wave AMPLITUDE first, then choose baseY inside a band that
+    // leaves room for the whole sine to swing without clipping the clamps.
+    const pathAmp  = lerp(L.pathAmpMin,  L.pathAmpMax,  rng());
+    const pathFreq = lerp(L.pathFreqMin, L.pathFreqMax, rng());
+    const baseY = lerp(L.minY + pathAmp, L.maxY - pathAmp, rng());
     state.lionfish.push({
       id: state.nextLionfishId++,
       x: W.w + L.bodyRX * scale + 20,
@@ -507,9 +514,7 @@ export const Sim = {
       vx: -speed,
       swimT: rng() * 10,
       wavePhase: rng() * Math.PI * 2,
-      // Per-instance wavy drift path so each lionfish varies its depth as it crosses.
-      pathAmp:  lerp(L.pathAmpMin,  L.pathAmpMax,  rng()),
-      pathFreq: lerp(L.pathFreqMin, L.pathFreqMax, rng()),
+      pathAmp, pathFreq,
       scale
     });
   },
