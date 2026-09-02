@@ -33,11 +33,12 @@ export const CFG = {
     invulnDur: 1.5   // seconds of i-frames after losing a life
   },
   shark: {
-    minSpeed: 175, maxSpeed: 285,
+    // 10% off the previous 175/285 baseline - sharks are a touch less brisk.
+    minSpeed: 158, maxSpeed: 257,
     // Sharks arrive noticeably later than the other hazards so the early
     // round is a gentle warm-up with rays, octopuses, lionfish, and eels.
     // Fewer sharks overall - other hazards carry more of the load.
-    earliestT: 14,     // no sharks until this many seconds in
+    earliestT: 18,     // no sharks until this many seconds in (later on medium)
     spawnStart: 5.5,   // seconds between spawns once the earliestT gate opens
     spawnMin: 0.9,     // fastest spawn interval late-game
     rampTime: 26,      // seconds to reach peak difficulty (steep, front-loaded)
