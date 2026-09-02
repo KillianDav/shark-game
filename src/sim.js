@@ -116,7 +116,10 @@ export const CFG = {
     // where 0 = +X (right), pi/2 = +Y (down), pi = -X (left).
     spreadMin: Math.PI * 0.18,             // lower-right
     spreadMax: Math.PI * 0.82,             // lower-left
-    swayAmp: 0.14
+    swayAmp: 0.14,
+    // Vertical drift path across the screen - a proper wavy line.
+    pathAmpMin: 22, pathAmpMax: 40,
+    pathFreqMin: 0.35, pathFreqMax: 0.65
   },
   lionfish: {
     // Lionfish: horizontal striped body with a fan of DORSAL SPIKES rising
@@ -139,7 +142,10 @@ export const CFG = {
     rootSpread: 1.4,
     // Slight outward lean of the outermost spikes (radians).
     tiltAmp: 0.32,
-    swayAmp: 0.06
+    swayAmp: 0.06,
+    // Vertical drift path - hazards vary their depth as they cross.
+    pathAmpMin: 18, pathAmpMax: 32,
+    pathFreqMin: 0.4, pathFreqMax: 0.75
   },
   electricEel: {
     // Long slender eel that swims right-to-left, intermittently discharging
@@ -340,12 +346,16 @@ export const Sim = {
       nextBoatId: 1,
       nextAnchorId: 1,
       nextCoffinId: 1,
-      spawnTimer: 0.5,                                    // starts ticking once t >= shark.earliestT
-      raySpawnTimer:      diff.stingray.earliestT,        // first ray no earlier than earliestT
-      octopusSpawnTimer:  diff.octopus.earliestT,         // first octopus no earlier than earliestT
-      lionfishSpawnTimer: diff.lionfish.earliestT,        // first lionfish no earlier than earliestT
-      eelSpawnTimer:      diff.electricEel.earliestT,     // first eel no earlier than earliestT
-      anchorSpawnTimer:   diff.anchor.earliestT,          // first anchor no earlier than earliestT
+      // Every hazard's spawn timer starts at 0.5 s. Combined with the
+      // per-hazard earliestT gate in step(), each hazard's FIRST appearance
+      // lands at ~t=(earliestT + 0.5) rather than 2*earliestT (the old bug
+      // that made the round feel too slow to get going).
+      spawnTimer:         0.5,                            // sharks
+      raySpawnTimer:      0.5,
+      octopusSpawnTimer:  0.5,
+      lionfishSpawnTimer: 0.5,
+      eelSpawnTimer:      0.5,
+      anchorSpawnTimer:   0.5,
       winnerId: null
     };
   },
@@ -478,6 +488,9 @@ export const Sim = {
       vx: -speed,
       swimT: rng() * 10,
       wavePhase: rng() * Math.PI * 2,
+      // Per-instance wavy drift path so each octopus varies its depth as it crosses.
+      pathAmp:  lerp(O.pathAmpMin,  O.pathAmpMax,  rng()),
+      pathFreq: lerp(O.pathFreqMin, O.pathFreqMax, rng()),
       scale
     });
   },
@@ -494,6 +507,9 @@ export const Sim = {
       vx: -speed,
       swimT: rng() * 10,
       wavePhase: rng() * Math.PI * 2,
+      // Per-instance wavy drift path so each lionfish varies its depth as it crosses.
+      pathAmp:  lerp(L.pathAmpMin,  L.pathAmpMax,  rng()),
+      pathFreq: lerp(L.pathFreqMin, L.pathFreqMax, rng()),
       scale
     });
   },
@@ -808,19 +824,19 @@ export const Sim = {
     }
     state.stingrays = state.stingrays.filter((r) => r.x > -80);
 
-    // --- move octopuses (slow drift + gentle vertical bob) ---
+    // --- move octopuses (slow drift + clearly wavy vertical path) ---
     for (const o of state.octopuses) {
       o.x += o.vx * dt;
       o.swimT += dt;
-      o.y = clamp(o.baseY + Math.sin(o.swimT * 0.8 + o.wavePhase) * 8, O.minY, O.maxY);
+      o.y = clamp(o.baseY + Math.sin(o.swimT * o.pathFreq + o.wavePhase) * o.pathAmp, O.minY, O.maxY);
     }
     state.octopuses = state.octopuses.filter((o) => o.x > -60);
 
-    // --- move lionfish (drift + slight bob) ---
+    // --- move lionfish (drift + clearly wavy vertical path) ---
     for (const f of state.lionfish) {
       f.x += f.vx * dt;
       f.swimT += dt;
-      f.y = clamp(f.baseY + Math.sin(f.swimT * 0.9 + f.wavePhase) * 6, L.minY, L.maxY);
+      f.y = clamp(f.baseY + Math.sin(f.swimT * f.pathFreq + f.wavePhase) * f.pathAmp, L.minY, L.maxY);
     }
     state.lionfish = state.lionfish.filter((f) => f.x > -60);
 

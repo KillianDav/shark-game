@@ -15,6 +15,7 @@ function stateWithOneOctopus(overrides = {}) {
   s.players[0].lives = 1;
   s.octopuses = [{
     id: 1, x: 800, y: 400, baseY: 400, swimT: 0, wavePhase: 0,
+    pathAmp: 0, pathFreq: 0,
     vx: 0, scale: 1.1,
     ...overrides
   }];
