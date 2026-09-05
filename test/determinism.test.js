@@ -43,27 +43,10 @@ function runSim(config) {
   return state;
 }
 
-// Strip the rng closure and round numbers so JSON serialisation is stable.
-function scrub(v) {
-  if (typeof v === 'function') return undefined;
-  if (Array.isArray(v)) return v.map(scrub);
-  if (v && typeof v === 'object') {
-    const out = {};
-    for (const [k, val] of Object.entries(v)) {
-      // rng is a closure (unserialisable); diff is a resolved snapshot of the
-      // difficulty preset (a copy of CFG) and would bloat the fixture and
-      // couple it to unrelated CFG tuning changes - exclude both from the
-      // comparison.
-      if (k === 'rng' || k === 'diff') continue;
-      const sv = scrub(val);
-      if (sv !== undefined) out[k] = sv;
-    }
-    return out;
-  }
-  if (typeof v !== 'number') return v;
-  const r = Math.round(v * 1e6) / 1e6;
-  return Object.is(r, -0) ? 0 : r;   // normalise signed zero so JSON round-trips cleanly
-}
+// The scrubber lives on Sim (Sim.snapshotForWire) because the multiplayer
+// server broadcasts snapshots through the same pipeline. Using the same
+// function here means the fixture and the wire format can never drift.
+const scrub = Sim.snapshotForWire;
 
 test('sim is self-consistent: same seed + same inputs produce equal state', () => {
   const a = scrub(runSim(CONFIG));

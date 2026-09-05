@@ -1086,5 +1086,30 @@ export const Sim = {
       state.winnerId = survivors[0].id;
       state.status = "over";
     }
+  },
+
+  // JSON-safe snapshot for wire transmission. Drops the rng closure
+  // (unserialisable) and the diff config snapshot (resolvable from
+  // state.difficulty on the client). Also normalises signed zero so JSON
+  // round-trips are stable. The same scrubber is used by the determinism
+  // test and by server/room.js when broadcasting snapshots.
+  snapshotForWire(state) {
+    return Sim._scrub(state);
+  },
+  _scrub(v) {
+    if (typeof v === "function") return undefined;
+    if (Array.isArray(v)) return v.map(Sim._scrub);
+    if (v && typeof v === "object") {
+      const out = {};
+      for (const [k, val] of Object.entries(v)) {
+        if (k === "rng" || k === "diff") continue;
+        const sv = Sim._scrub(val);
+        if (sv !== undefined) out[k] = sv;
+      }
+      return out;
+    }
+    if (typeof v !== "number") return v;
+    const r = Math.round(v * 1e6) / 1e6;
+    return Object.is(r, -0) ? 0 : r;
   }
 };

@@ -5,7 +5,11 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "start": "node server/index.js",
     "test": "node --test test/*.test.js",
     "serve": "python -m http.server 8912 --bind 127.0.0.1"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
   }
 }
