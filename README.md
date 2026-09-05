@@ -109,7 +109,44 @@ Today `LocalTransport` runs the Sim in the same browser tab. The main loop uses
 a **fixed timestep** (`1/60s`) so the simulation is deterministic and
 network-friendly.
 
-## Phase 2 — shared multiplayer arena (not built yet)
+## Multiplayer (Phase 2 — built!)
+
+Setup screen has a **Play** toggle: **Local** (this browser) or **Online**
+(share a room with teammates).
+
+Online play flow:
+
+1. Everyone opens the same URL (e.g. `https://standup-shark.fly.dev/`).
+2. First player picks Online → types their name → clicks **Create room**.
+   They get a 4-letter code (e.g. `WAVE`).
+3. Everyone else picks Online → types a name → enters the code → **Join**.
+4. Host clicks **Start the swim** — everyone drops into the same
+   authoritative ocean; each person controls their own diver.
+
+Under the hood: one Node process (`server/index.js`) runs the authoritative
+Sim per room at 60 Hz and broadcasts state snapshots at ~20 Hz. Clients
+render the latest snapshot; only inputs travel client → server. See
+`handoff.md` for the wire protocol and the server internals.
+
+Local play still works exactly as before — the LocalTransport code path is
+untouched. Solo survival stays local-only.
+
+## Hosting on Fly.io
+
+Fly is the recommended home: websocket-friendly, always-on, ~$2/month for
+the single 256 MB shared-cpu-1x machine used here.
+
+```bash
+flyctl auth signup       # or `login` if you already have an account
+fly launch --copy-config --no-deploy   # first time only
+fly deploy               # every subsequent push
+fly logs                 # tail server logs
+```
+
+See `fly.toml` for the deploy config (region, VM size, WebSocket-sticky
+concurrency).
+
+## (Historical) Phase 2 sketch — see the "Multiplayer" section above for what was actually built
 
 Everyone swims in the same ocean at once, dodging the same sharks, live-synced.
 The plan reuses the layers above unchanged except for Transport.

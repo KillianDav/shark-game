@@ -133,7 +133,36 @@ Still being iterated. Do not treat as finished.
 - **`state.rng` is a closure, not serialisable.** Deep-cloning or JSON-round-tripping the state loses it. Fine locally; when the server ships snapshots to clients, the server should send only the seed (or a resumable RNG state) and the client re-derives RNG from that. Not urgent — flag it before you first hand a Sim state across a wire.
 - Signed zero in numeric fields: `vy` can end up as `-0` when damping hits exactly zero, then JSON round-trips it to `+0`. The determinism test's `scrub()` normalises this — copy that helper if you write another Sim-comparing test.
 
-## Phase 2 — online multiplayer (not built)
+## Multiplayer server (Phase 2 — BUILT)
+
+`server/index.js` is the single Node process that runs on Fly.io. It:
+- serves the static client (`index.html`, `src/*.js`) from the same origin as `/ws`,
+- exposes `/health` for Fly's health check,
+- hosts a `WebSocketServer` on `/ws`,
+- routes each connection into a `Room` instance in the in-memory registry (`Map<code, Room>`),
+- allocates 4-letter room codes from a confusable-safe alphabet (no I/O).
+
+`server/room.js`'s `Room` owns the authoritative Sim state for one round:
+- `addPlayer(ws, name)` / `removePlayerByWs(ws)` / host promotion / auto-shutdown when empty
+- `start(config, hostWs)` (host-only) → `Sim.createState({...config, seed})` + `setInterval` at `CFG.fixedDt`
+- `_tick(dt)` → `Sim.step`; every 3rd tick, broadcast `{type:"state", state: Sim.snapshotForWire(state)}`
+- when `state.status === "over"` → broadcast `over`, linger for `OVER_LINGER_MS` (4 s) so late joiners see the result overlay, then `_shutdown()` (calls `onEmpty` to free the code)
+
+Wire protocol (JSON over ws):
+- **Client → server:** `create` / `join` / `input` / `start` / `leave`
+- **Server → client:** `you` (your player id), `lobby` (roster + host + code), `start` (config with seed), `state` (snapshot at ~20 Hz), `over` (winnerId), `error`
+
+Shared serialisation lives on `Sim`:
+- `Sim.snapshotForWire(state)` — JSON-safe copy; drops `rng` closure and `diff` snapshot; normalises signed zero. Used by the server broadcast AND the determinism test.
+- `Sim.hydrateWireSnapshot(state)` — restores `state.diff` from `state.difficulty` on incoming client snapshots so `Render.drawState` can read HUD/scroll fields.
+
+Client: `src/transport-websocket.js` is a `WebSocketTransport` that mirrors `LocalTransport`'s interface (`start / sendInput / tick / snapshot / isOver`) + lobby helpers (`createRoom / joinRoom / leaveRoom / close`) and callbacks (`onLobby / onStart / onOver / onError`). `main.js` picks `LocalTransport` or `WebSocketTransport` from the setup screen's **Play** radios; `defaultServerUrl()` uses the page's own origin's `/ws` (overridable via `?server=ws://...` for local dev of a client against a remote server).
+
+Deploy on Fly.io — see the "Hosting on Fly.io" section in README and the top of `fly.toml` for commands. Rooms live in Node memory; a Fly restart wipes them, which is fine for stand-ups.
+
+Server tests: `test/server-room.test.js` covers Room lifecycle with a mock ws (roster/host promotion, start rejects non-host, tick advances Sim and broadcasts snapshots at ~20 Hz, input buffering, over resolution).
+
+## (Historical) Phase 2 build order — see above for what was shipped
 
 This is the next real feature. Goal: each player opens a hosted URL, types a name, joins a room, and all swim in **one authoritative ocean**.
 
