@@ -1096,6 +1096,15 @@ export const Sim = {
   snapshotForWire(state) {
     return Sim._scrub(state);
   },
+  // Inverse of snapshotForWire: restore the `.diff` config snapshot on a
+  // state that arrived over the wire. Render.js reads state.diff.* for HUD +
+  // scroll speed, so online clients need this before drawing. `.rng` stays
+  // absent because online clients never call Sim.step themselves.
+  hydrateWireSnapshot(state) {
+    if (!state || state.diff) return state;
+    state.diff = _resolveDiff(state.difficulty);
+    return state;
+  },
   _scrub(v) {
     if (typeof v === "function") return undefined;
     if (Array.isArray(v)) return v.map(Sim._scrub);

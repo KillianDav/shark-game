@@ -57,7 +57,17 @@
   </div>
 
   <div id="setup">
-    <div class="modes">
+    <div class="field-row" role="radiogroup" aria-label="Where to play" style="margin-bottom:2px;">
+      <span class="field">Play</span>
+      <label class="hint" style="display:flex; align-items:center; gap:4px;">
+        <input type="radio" name="playMode" value="local" checked /> Local (this browser)
+      </label>
+      <label class="hint" style="display:flex; align-items:center; gap:4px;">
+        <input type="radio" name="playMode" value="online" /> Online (share a room)
+      </label>
+    </div>
+
+    <div class="modes" data-when="local">
       <label class="mode"><input type="radio" name="mode" value="party" checked>
         <span><span class="m-title">Party</span> &mdash; the whole team swims; the last one running dodges the sharks and runs the next standup.</span>
       </label>
@@ -79,10 +89,10 @@
       </label>
     </div>
 
-    <label class="field" for="names">Team members (one per line)</label>
-    <textarea id="names" spellcheck="false" placeholder="Ahmed&#10;Ben&#10;Chris"></textarea>
+    <label class="field" for="names" data-when="local">Team members (one per line)</label>
+    <textarea id="names" spellcheck="false" placeholder="Ahmed&#10;Ben&#10;Chris" data-when="local"></textarea>
 
-    <div class="field-row">
+    <div class="field-row" data-when="local">
       <label class="field" for="botCount">Practice bots</label>
       <input type="number" id="botCount" min="0" max="10" value="3" />
       <span class="hint">Extra AI swimmers (Party mode only). Set 0 to swim with just your team.</span>
@@ -102,11 +112,44 @@
       <span class="hint">Adds tail-whip stingrays that patrol the seabed. Uncheck for classic laser-sharks-only.</span>
     </div>
 
-    <div class="row">
+    <div class="row" data-when="local">
       <button id="startBtn">Start the swim</button>
       <button id="resetNamesBtn" class="secondary">Reset to defaults</button>
     </div>
-    <div class="hint">You control the first name in the list with the &uarr; / &darr; arrow keys. Bots dodge on their own.</div>
+    <div class="hint" data-when="local">You control the first name in the list with the &uarr; / &darr; arrow keys. Bots dodge on their own.</div>
+
+    <!-- Online lobby: name + create/join, then roster + host Start once in a room -->
+    <div id="onlineSetup" data-when="online" style="display:none; flex-direction:column; gap:10px;">
+      <div class="field-row">
+        <label class="field" for="onlineName">Your name</label>
+        <input type="text" id="onlineName" maxlength="20" placeholder="Ada" style="background:#071829; color:var(--text); border:1px solid #1c3a5c; border-radius:8px; padding:8px 10px; font-size:15px; min-width:160px;" />
+      </div>
+      <div id="onlineChoose">
+        <div class="row" style="gap:8px;">
+          <button id="createRoomBtn">Create room</button>
+          <span class="hint">or</span>
+          <input type="text" id="joinCodeInput" maxlength="4" placeholder="CODE" style="background:#071829; color:var(--text); border:1px solid #1c3a5c; border-radius:8px; padding:8px 10px; font-size:15px; text-transform:uppercase; letter-spacing:3px; width:80px; text-align:center;" />
+          <button id="joinRoomBtn" class="secondary">Join</button>
+        </div>
+        <div id="onlineError" class="hint" style="color:var(--danger); min-height:1.2em;"></div>
+      </div>
+      <div id="onlineLobby" style="display:none; flex-direction:column; gap:8px;">
+        <div class="field-row">
+          <span class="field">Room code</span>
+          <span id="roomCodeBadge" style="font-family:'Consolas',monospace; font-size:22px; letter-spacing:6px; color:var(--accent); background:#071829; padding:6px 12px; border-radius:8px; border:1px solid #1c3a5c;">----</span>
+          <span class="hint">Share this code so teammates can join.</span>
+        </div>
+        <div>
+          <div class="field">Swimmers in the room</div>
+          <ul id="roomRoster" style="list-style:none; padding:0; margin:6px 0; display:flex; flex-wrap:wrap; gap:6px;"></ul>
+        </div>
+        <div class="row">
+          <button id="onlineStartBtn">Start the swim</button>
+          <button id="leaveRoomBtn" class="secondary">Leave room</button>
+        </div>
+        <div id="onlineStartHint" class="hint">Only the host can start the round.</div>
+      </div>
+    </div>
   </div>
 
   <div id="stage">
