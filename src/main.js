@@ -234,6 +234,7 @@ function endGame(state) {
   game.running = false;
   Input.detach();
   cancelAnimationFrame(game.raf);
+  audio.stop();     // silence ambience when the round ends; next Start restarts it
 
   const winner = state.players.find((p) => p.id === state.winnerId);
   els.status.textContent = "Round over.";

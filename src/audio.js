@@ -229,6 +229,18 @@ export function makeAudio() {
       started = true;
       if (ctx.state === "suspended") ctx.resume().catch(() => { /* ignore */ });
     },
+    // Tear the whole audio graph down. The next start() rebuilds from
+    // scratch (so mid-round pings / shimmer state don't leak across
+    // rounds). Called by main.js when a round ends.
+    stop() {
+      if (!started) return;
+      if (pingTimer)    { clearTimeout(pingTimer);    pingTimer = null; }
+      if (shimmerTimer) { clearTimeout(shimmerTimer); shimmerTimer = null; }
+      if (ctx) {
+        try { ctx.close(); } catch { /* already closed */ }
+      }
+      ctx = null; masterGain = null; started = false;
+    },
     isStarted() { return started; },
     isMuted()   { return muted; },
     setMuted(next) {
