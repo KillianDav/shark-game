@@ -11,7 +11,7 @@
 #
 # Rooms live in the Node process's memory, so a restart wipes them. That's
 # acceptable for a standup game - rounds are short.
-app = "standup-shark"
+app = "shark-game"
 primary_region = "lhr"
 
 [build]
@@ -27,7 +27,7 @@ primary_region = "lhr"
 # WebSockets: stick a client to whichever machine handled their upgrade so
 # lobby state (rooms, host, roster) doesn't hop between VMs. Only matters
 # if we ever scale past 1 machine; harmless with a single instance.
-[[http_service.concurrency]]
+[http_service.concurrency]
   type = "connections"
   hard_limit = 400
   soft_limit = 200
