@@ -19,6 +19,7 @@ import { Render } from './render.js';
 import { Input } from './input.js';
 import { LocalTransport } from './transport-local.js';
 import { WebSocketTransport } from './transport-websocket.js';
+import { makeAudio } from './audio.js';
 
 const DEFAULT_NAMES = ["Ahmed", "Ben", "Chris", "Dana", "Eve"];
 
@@ -41,6 +42,7 @@ const els = {
   editBtn: document.getElementById("editBtn"),
   fsBtn: document.getElementById("fsBtn"),
   skipBtn: document.getElementById("skipBtn"),
+  muteBtn: document.getElementById("muteBtn"),
   // Online lobby
   onlineSetup: document.getElementById("onlineSetup"),
   onlineChoose: document.getElementById("onlineChoose"),
@@ -57,6 +59,16 @@ const els = {
   leaveRoomBtn: document.getElementById("leaveRoomBtn")
 };
 const ctx = els.canvas.getContext("2d");
+
+// Ambient underwater audio - deferred init on first user gesture so the
+// browser autoplay policy doesn't block us. Mute state persists in
+// localStorage.
+const audio = makeAudio();
+function refreshMuteBtn() {
+  if (!els.muteBtn) return;
+  els.muteBtn.textContent = audio.isMuted() ? "🔇 Muted" : "🔊 Sound";
+}
+function startAudioOnce() { audio.start(); refreshMuteBtn(); }
 
 const game = {
   transport: null,
@@ -184,6 +196,7 @@ function enterStage(statusText) {
   els.status.textContent = statusText;
   Input.reset();
   Input.attach();
+  startAudioOnce();     // Start button click is a user gesture - kick off ambient audio
   game.running = true;
   game.acc = 0;
   game.last = performance.now();
@@ -294,6 +307,15 @@ els.fsBtn.addEventListener("click", () => {
   if (!document.fullscreenElement) els.stage.requestFullscreen && els.stage.requestFullscreen();
   else document.exitFullscreen && document.exitFullscreen();
 });
+
+if (els.muteBtn) {
+  els.muteBtn.addEventListener("click", () => {
+    audio.start();       // first click also unlocks audio if we haven't yet
+    audio.toggleMute();
+    refreshMuteBtn();
+  });
+  refreshMuteBtn();
+}
 
 // Solo mode ignores the roster/bots - grey out the bot count when selected.
 document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", () => {
