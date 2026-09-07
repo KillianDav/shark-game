@@ -1,38 +1,27 @@
-# Fly.io app config for standup-shark.
-# The primary_region is where the single always-on machine runs. LHR (London)
-# is a good default for a UK team - change if your team is elsewhere.
+# fly.toml app configuration file generated for shark-game on 2026-09-07T09:54:25Z
 #
-# Deploy commands (from the standup-shark folder):
-#   flyctl auth signup    # or flyctl auth login (once per machine)
-#   fly launch --copy-config --no-deploy   # first time only - reserves the app name
-#   fly deploy            # every subsequent deploy
-#   fly logs              # tail live logs
-#   fly status            # inspect running machines
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# Rooms live in the Node process's memory, so a restart wipes them. That's
-# acceptable for a standup game - rounds are short.
-app = "shark-game"
-primary_region = "lhr"
+
+app = 'shark-game'
+primary_region = 'lhr'
 
 [build]
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = false     # keep the machine always on so join-by-URL is instant
+  auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 1
-  processes = ["app"]
+  processes = ['app']
 
-# WebSockets: stick a client to whichever machine handled their upgrade so
-# lobby state (rooms, host, roster) doesn't hop between VMs. Only matters
-# if we ever scale past 1 machine; harmless with a single instance.
-[http_service.concurrency]
-  type = "connections"
-  hard_limit = 400
-  soft_limit = 200
+  [http_service.concurrency]
+    type = 'connections'
+    hard_limit = 400
+    soft_limit = 200
 
 [[vm]]
-  cpu_kind = "shared"
+  cpu_kind = 'shared'
   cpus = 1
   memory_mb = 256
