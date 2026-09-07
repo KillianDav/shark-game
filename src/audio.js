@@ -10,13 +10,10 @@
 //   2. Two sub-bass sine drones at 55.0 Hz and 55.7 Hz. The tiny detuning
 //      makes them beat every ~1.4 s - a natural throb that never quite
 //      repeats.
-//   3. A wandering mid drone (~180 Hz) whose pitch drifts ± 40 Hz over
-//      ~30 s via a second LFO. Ran through a narrow bandpass so it
-//      sounds like a resonant pipe under the ocean.
-//   4. Rare deep sonar "pings": a short sine burst at a random low pitch,
+//   3. Rare deep sonar "pings": a short sine burst at a random low pitch,
 //      volume swelling then decaying over 3-5 s. Fires roughly every
 //      18-45 s. The variety keeps the ambience feeling alive.
-//   5. Even rarer "shimmer" - bandpassed white-noise sweep, once every
+//   4. Even rarer "shimmer" - bandpassed white-noise sweep, once every
 //      45-90 s. Adds an alien, faintly musical quality.
 //
 // Everything is quiet by design (master gain 0.55, individual layers even
@@ -43,7 +40,6 @@ export function makeAudio() {
 
     _makeHushLayer();
     _makeSubBassLayer();
-    _makeMidDroneLayer();
     _schedulePings();
     _scheduleShimmer();
     return true;
@@ -106,43 +102,7 @@ export function makeAudio() {
     lfo.start();
   }
 
-  // ---- Layer 3: wandering mid drone ----
-  function _makeMidDroneLayer() {
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = 180;
-
-    const bandPass = ctx.createBiquadFilter();
-    bandPass.type = "bandpass";
-    bandPass.frequency.value = 180;
-    bandPass.Q.value = 6;
-
-    const g = ctx.createGain();
-    g.gain.value = 0.028;
-
-    osc.connect(bandPass).connect(g).connect(masterGain);
-    osc.start();
-
-    // LFO on the oscillator pitch: ±40 Hz over ~30 s.
-    const lfo = ctx.createOscillator();
-    lfo.type = "sine";
-    lfo.frequency.value = 1 / 30;
-    const lfoAmt = ctx.createGain();
-    lfoAmt.gain.value = 40;
-    lfo.connect(lfoAmt).connect(osc.frequency);
-    lfo.start();
-
-    // Also drift the bandpass along with it, staying centred on the tone.
-    const lfo2 = ctx.createOscillator();
-    lfo2.type = "sine";
-    lfo2.frequency.value = 1 / 30;
-    const lfo2Amt = ctx.createGain();
-    lfo2Amt.gain.value = 40;
-    lfo2.connect(lfo2Amt).connect(bandPass.frequency);
-    lfo2.start();
-  }
-
-  // ---- Layer 4: rare deep sonar-ish pings ----
+  // ---- Layer 3: rare deep sonar-ish pings ----
   function _schedulePings() {
     const fire = () => {
       _ping();
@@ -179,7 +139,7 @@ export function makeAudio() {
     osc.stop(now + attack + sustain + release + 0.1);
   }
 
-  // ---- Layer 5: even rarer shimmer sweeps ----
+  // ---- Layer 4: even rarer shimmer sweeps ----
   function _scheduleShimmer() {
     const fire = () => {
       _shimmer();
