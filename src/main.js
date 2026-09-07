@@ -26,7 +26,6 @@ const els = {
   names: document.getElementById("names"),
   botCount: document.getElementById("botCount"),
   livesCount: document.getElementById("livesCount"),
-  stingraysToggle: document.getElementById("stingraysToggle"),
   startBtn: document.getElementById("startBtn"),
   resetNamesBtn: document.getElementById("resetNamesBtn"),
   setup: document.getElementById("setup"),
@@ -145,7 +144,7 @@ function renderRoomLobby(info) {
 
 function commonRoundConfig() {
   return {
-    hazards: (els.stingraysToggle && els.stingraysToggle.checked) ? "all" : "sharks-only",
+    hazards: "all",   // stingrays/octopuses/lionfish/eels/anchors always on; sharks-only mode kept for tests only
     lives: clamp(parseInt(els.livesCount.value, 10) || 1, 1, 9),
     difficulty: currentDifficulty()
   };

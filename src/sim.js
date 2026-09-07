@@ -33,16 +33,18 @@ export const CFG = {
     invulnDur: 1.5   // seconds of i-frames after losing a life
   },
   shark: {
-    // 10% off the previous 175/285 baseline - sharks are a touch less brisk.
-    minSpeed: 158, maxSpeed: 257,
+    // 20% slower than the previous 158/257 baseline so the first sharks feel
+    // less punishing; the shared _speedMul ramps them back up over time.
+    minSpeed: 126, maxSpeed: 206,
     // Sharks arrive noticeably later than the other hazards so the early
     // round is a gentle warm-up with rays, octopuses, lionfish, and eels.
-    // Fewer sharks overall - other hazards carry more of the load.
+    // Fewer sharks overall AND a more gradual buildup - the front-load on
+    // the ramp is softened.
     earliestT: 18,     // no sharks until this many seconds in (later on medium)
-    spawnStart: 5.5,   // seconds between spawns once the earliestT gate opens
+    spawnStart: 7.5,   // seconds between spawns once the earliestT gate opens (was 5.5)
     spawnMin: 0.9,     // fastest spawn interval late-game
-    rampTime: 26,      // seconds to reach peak difficulty (steep, front-loaded)
-    rampEase: 0.6,     // <1 front-loads the ramp so it gets hard fast
+    rampTime: 36,      // seconds to reach peak difficulty (was 26; longer, more gradual)
+    rampEase: 0.9,     // was 0.6 - closer to linear so the ramp isn't front-loaded
     minY: 120, maxY: 678,   // reaches the full swimmer range - no safe top/bottom corner
     aimAtSwimmer: true,     // on entry, aim at a swimmer's current y (locked, dodgeable)
     scaleMin: 1.55, scaleMax: 1.95,   // base sprite scale
