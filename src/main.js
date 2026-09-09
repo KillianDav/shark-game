@@ -261,8 +261,8 @@ function endGame(state) {
     els.winnerName.textContent = winner.name;
     els.swatch.style.background = winner.color;
     els.winnerTag.textContent = winner.isBot
-      ? "(a bot won this time - the humans need practice!) They run the next standup."
-      : "They run the next standup!";
+      ? "(a bot won this time - the humans need practice!) They pick who runs the next standup."
+      : "They pick who runs the next standup!";
   } else {
     els.resultLead.textContent = "No winner this round.";
     els.winnerName.textContent = "-";

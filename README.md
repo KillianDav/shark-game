@@ -3,7 +3,7 @@
 A stand-up picker game. Your team of **scuba divers** dodges the laser-eyed
 sharks, tail-whipping stingrays, hovering **blue-ringed octopuses**, spike-
 fanning **lionfish**, and the occasional anchor a passing boat drops through
-the water — the **winner runs the next standup**. Only the **dangerous
+the water — the **winner chooses who runs the next standup**. Only the **dangerous
 parts** kill: shark **teeth**, the **laser beam**, the **stingray sting
 circle**, the **octopus's blue rings** at each tentacle tip, the **lionfish
 spike tips**, and a direct **anchor** body hit. Control your diver with the
@@ -27,7 +27,7 @@ Pick a mode on the setup screen:
 
 - **Party** — the **first name** in the team list is you (keyboard-controlled)
   and every other name becomes an AI bot swimmer. "Practice bots" adds extra AI
-  swimmers. The last one still swimming wins and runs the next standup.
+  swimmers. The last one still swimming wins and picks who runs the next standup.
 - **Solo survival** — you swim alone. HUD shows size tier, tempo multiplier,
   and the current shark/ray/anchor counts. The result reports total survival
   time — ideal for testing the difficulty curve.

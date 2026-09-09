@@ -4,7 +4,7 @@ Read this first. It is the source of truth for continuing the project on another
 
 ## What this is
 
-A **standup picker game**: a team swims in an ocean, dodges laser-eyed sharks, and the **last player still swimming runs the next standup**.
+A **standup picker game**: a team swims in an ocean, dodges laser-eyed sharks, and the **last player still swimming chooses who runs the next standup**.
 
 **End goal:** host it at a public URL so each person plays from their own browser, **in the same shared ocean at the same time**, live-synced. One room, one simulation, everyone sees the same sharks.
 
