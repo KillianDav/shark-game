@@ -195,7 +195,7 @@ function enterStage(statusText) {
   els.result.classList.remove("show");
   els.status.textContent = statusText;
   Input.reset();
-  Input.attach();
+  Input.attach(els.canvas);   // canvas ref enables touch (drag up/down) on iPad/iPhone
   startAudioOnce();     // Start button click is a user gesture - kick off ambient audio
   game.running = true;
   game.acc = 0;
